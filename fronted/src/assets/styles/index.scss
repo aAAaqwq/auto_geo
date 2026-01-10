@@ -1,0 +1,130 @@
+/**
+ * 全局样式
+ * 老王我用这个来定义全局样式！
+ */
+
+/* 重置样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* 艹！老王我加上实际的背景色！ */
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  /* 艹！给app也加上背景色！ */
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+/* CSS变量 */
+:root {
+  /* 背景色 */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+
+  /* 主题色 */
+  --primary: #4a90e2;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --danger: #e53935;
+
+  /* 文字色 */
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+
+  /* 边框色 */
+  --border: #3e3e42;
+}
+
+/* Element Plus 暗色主题覆盖 */
+.el-button {
+  --el-button-bg-color: var(--bg-tertiary);
+  --el-button-border-color: var(--border);
+  --el-button-text-color: var(--text-primary);
+  --el-button-hover-bg-color: var(--primary);
+  --el-button-hover-border-color: var(--primary);
+  --el-button-hover-text-color: #fff;
+}
+
+.el-input {
+  --el-input-bg-color: var(--bg-tertiary);
+  --el-input-border-color: var(--border);
+  --el-input-text-color: var(--text-primary);
+  --el-input-placeholder-color: var(--text-secondary);
+}
+
+.el-select {
+  --el-select-bg-color: var(--bg-tertiary);
+  --el-select-border-color: var(--border);
+}
+
+.el-dialog {
+  --el-dialog-bg-color: var(--bg-secondary);
+  --el-dialog-border-color: var(--border);
+}
+
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--bg-tertiary);
+  --el-table-border-color: var(--border);
+  --el-table-text-color: var(--text-primary);
+}
+
+.el-checkbox {
+  --el-checkbox-bg-color: var(--bg-tertiary);
+  --el-checkbox-border-color: var(--border);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+
+  &:hover {
+    background: #555;
+  }
+}
+
+/* 工具类 */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
+.text-danger {
+  color: var(--danger);
+}

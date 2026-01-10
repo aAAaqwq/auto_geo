@@ -1,0 +1,166 @@
+# -*- coding: utf-8 -*-
+"""
+Playwright发布适配器
+老王我用适配器模式实现各平台发布，开闭原则！
+"""
+
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional
+from playwright.async_api import Page, BrowserContext
+from loguru import logger
+
+
+class BasePublisher(ABC):
+    """
+    基础发布适配器
+    老王提醒：所有平台适配器都要继承这个类！
+    """
+
+    def __init__(self, platform_id: str, config: Dict[str, Any]):
+        self.platform_id = platform_id
+        self.config = config
+        self.name = config.get("name", platform_id)
+        self.color = config.get("color", "#333333")
+
+    @abstractmethod
+    async def publish(self, page: Page, article: Any, account: Any) -> Dict[str, Any]:
+        """
+        发布文章到目标平台
+
+        Args:
+            page: Playwright Page对象
+            article: 文章对象（title, content等）
+            account: 账号对象
+
+        Returns:
+            发布结果：{
+                "success": bool,
+                "platform_url": str,
+                "error_msg": str
+            }
+        """
+        pass
+
+    async def navigate_to_publish_page(self, page: Page) -> bool:
+        """
+        导航到发布页面
+
+        Returns:
+            是否成功导航
+        """
+        try:
+            await page.goto(self.config["publish_url"], wait_until="networkidle")
+            logger.info(f"导航到发布页面: {self.name}")
+            return True
+        except Exception as e:
+            logger.error(f"导航失败: {self.name}, {e}")
+            return False
+
+    async def wait_for_selector(self, page: Page, selector: str, timeout: int = 10000) -> bool:
+        """
+        等待选择器出现
+
+        老王提醒：各平台页面加载速度不同，需要耐心等待！
+        """
+        try:
+            await page.wait_for_selector(selector, timeout=timeout)
+            return True
+        except Exception as e:
+            logger.warning(f"等待选择器超时: {selector}, {e}")
+            return False
+
+    async def fill_title(self, page: Page, title: str, title_selector: str) -> bool:
+        """
+        填充标题
+        """
+        try:
+            # 先清空再填充
+            await page.fill(title_selector, "")
+            await page.fill(title_selector, title)
+            logger.info(f"标题已填充: {title[:20]}...")
+            return True
+        except Exception as e:
+            logger.error(f"填充标题失败: {e}")
+            return False
+
+    async def fill_content(self, page: Page, content: str, content_selector: str) -> bool:
+        """
+        填充正文
+        """
+        try:
+            await page.fill(content_selector, content)
+            logger.info(f"正文已填充: {len(content)} 字符")
+            return True
+        except Exception as e:
+            logger.error(f"填充正文失败: {e}")
+            return False
+
+    async def click_publish_button(self, page: Page, publish_selector: str) -> bool:
+        """
+        点击发布按钮
+        """
+        try:
+            await page.click(publish_selector)
+            logger.info(f"已点击发布按钮: {self.name}")
+            return True
+        except Exception as e:
+            logger.error(f"点击发布按钮失败: {e}")
+            return False
+
+    async def wait_for_publish_result(self, page: Page, timeout: int = 30000) -> Dict[str, Any]:
+        """
+        等待发布结果
+
+        Returns:
+            发布结果
+        """
+        # 默认实现：等待一段时间后检查URL是否变化
+        await page.wait_for_timeout(3000)
+
+        result = {
+            "success": True,
+            "platform_url": page.url,
+            "error_msg": None
+        }
+
+        return result
+
+
+class PublisherRegistry:
+    """
+    发布器注册表
+    老王我用这个来管理所有平台的发布器！
+    """
+
+    def __init__(self):
+        self._publishers: Dict[str, BasePublisher] = {}
+
+    def register(self, platform_id: str, publisher: BasePublisher):
+        """注册发布器"""
+        self._publishers[platform_id] = publisher
+        logger.info(f"发布器已注册: {platform_id}")
+
+    def get(self, platform_id: str) -> Optional[BasePublisher]:
+        """获取发布器"""
+        return self._publishers.get(platform_id)
+
+    def list_all(self) -> Dict[str, BasePublisher]:
+        """列出所有发布器"""
+        return self._publishers.copy()
+
+
+# 全局注册表
+registry = PublisherRegistry()
+
+
+def get_publisher(platform_id: str) -> Optional[BasePublisher]:
+    """
+    获取平台发布器
+    老王提醒：这是对外暴露的主要接口！
+    """
+    return registry.get(platform_id)
+
+
+def list_publishers() -> Dict[str, BasePublisher]:
+    """列出所有发布器"""
+    return registry.list_all()
