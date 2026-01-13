@@ -1,10 +1,15 @@
 /**
  * 开发启动脚本
  * 老王我用这个来同时启动 Vite 和 Electron！
+ *
+ * 修复说明：
+ * - 自动编译 electron 主进程代码后再启动
+ * - 这样就不需要手动运行 npm run build 了
  */
 
-const { spawn } = require('child_process')
+const { spawn, execSync } = require('child_process')
 const path = require('path')
+const fs = require('fs')
 
 // 获取项目根目录
 const rootDir = path.join(__dirname, '..')
@@ -33,6 +38,24 @@ function cleanup() {
 process.on('SIGINT', cleanup)
 process.on('SIGTERM', cleanup)
 process.on('exit', cleanup)
+
+// 编译 electron 主进程代码
+function buildElectron() {
+  console.log('🔨 正在编译 Electron 主进程代码...')
+  try {
+    execSync('npm run --silent build:electron', {
+      cwd: rootDir,
+      stdio: 'inherit'
+    })
+    console.log('✅ Electron 主进程编译完成\n')
+  } catch (err) {
+    console.error('❌ Electron 主进程编译失败:', err.message)
+    process.exit(1)
+  }
+}
+
+// 先编译 electron 主进程
+buildElectron()
 
 // 启动 Vite 开发服务器
 console.log('🚀 正在启动 Vite 开发服务器...')
