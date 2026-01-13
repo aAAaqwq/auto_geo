@@ -48,10 +48,10 @@ const BACKEND_CONFIG = {
 
   // 后端地址
   host: '127.0.0.1',
-  port: 8001  // 老王改的：避开8000端口占用,
+  port: 8001,
 
   // 健康检查 URL
-  get healthUrl(): string {
+  healthUrl(): string {
     return `http://${this.host}:${this.port}/api/health`
   }
 }
@@ -258,7 +258,7 @@ class BackendManager {
       entryFile: BACKEND_CONFIG.entryFile,
       host: BACKEND_CONFIG.host,
       port: BACKEND_CONFIG.port,
-      healthUrl: BACKEND_CONFIG.healthUrl,
+      healthUrl: BACKEND_CONFIG.healthUrl(),
       status: this.status,
       pid: this.process?.pid || null,
     }
@@ -306,7 +306,7 @@ class BackendManager {
    */
   private async checkHealth(): Promise<void> {
     try {
-      const response = await fetch(BACKEND_CONFIG.healthUrl, {
+      const response = await fetch(BACKEND_CONFIG.healthUrl(), {
         method: 'GET',
         signal: AbortSignal.timeout(5000) // 5 秒超时
       })
