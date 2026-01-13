@@ -13,7 +13,9 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "vite:dev": "vite",
+    "electron:dev": "electron ."
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
