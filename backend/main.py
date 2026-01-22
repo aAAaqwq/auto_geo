@@ -24,7 +24,7 @@ from backend.config import (
     CORS_ORIGINS, PLATFORMS
 )
 from backend.database import init_db, get_db
-from backend.api import account, article, publish, keywords, geo, index_check, reports, notifications, scheduler
+from backend.api import account, article, publish, keywords, geo, index_check, reports, notifications, scheduler, knowledge
 
 
 # ==================== WebSocket连接管理 ====================
@@ -118,6 +118,7 @@ app.include_router(index_check.router)  # 加上收录检测路由！
 app.include_router(reports.router)  # 加上数据报表路由！
 app.include_router(notifications.router)  # 加上预警通知路由！
 app.include_router(scheduler.router)  # 加上定时任务路由！
+app.include_router(knowledge.router)  # 加上知识库路由！
 
 
 # ==================== 基础接口 ====================

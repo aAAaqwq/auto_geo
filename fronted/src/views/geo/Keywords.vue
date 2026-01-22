@@ -61,6 +61,15 @@
 
         <!-- 蒸馏输入表单 -->
         <div class="distill-form" :class="{ disabled: !currentProject }">
+          <!-- 项目同步状态提示 -->
+          <div v-if="currentProject && isProjectSynced" class="sync-notice">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14">
+              <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 110-2 1 1 0 010 2z"/>
+            </svg>
+            <span>已自动从项目「{{ currentProject.name }}」填充信息，可直接修改或开始蒸馏</span>
+          </div>
+
+          <!-- 输入区域 -->
           <div class="form-group">
             <label class="form-label">
               <svg viewBox="0 0 16 16" fill="currentColor" width="14">
@@ -77,10 +86,8 @@
                 :disabled="!currentProject"
                 @keyup.enter="startDistill"
               >
-              <div v-if="isSynced" class="sync-badge">
-                <svg viewBox="0 0 16 16" fill="currentColor" width="12">
-                  <path d="M10.97 4.97a.75.75 0 011.07 1.05l-3.99 4.99a.75.75 0 01-1.08.02L4.324 8.384a.75.75 0 111.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 01.02-.022z"/>
-                </svg>
+              <div v-if="isKeywordFromProject" class="auto-fill-tag">
+                来自项目
               </div>
             </div>
           </div>
@@ -97,14 +104,12 @@
                 v-model="distillForm.company"
                 type="text"
                 class="form-input"
-                placeholder="自动填充"
+                placeholder="如：绿阳环保科技"
                 :disabled="!currentProject"
                 @keyup.enter="startDistill"
               >
-              <div v-if="isSynced" class="sync-badge">
-                <svg viewBox="0 0 16 16" fill="currentColor" width="12">
-                  <path d="M10.97 4.97a.75.75 0 011.07 1.05l-3.99 4.99a.75.75 0 01-1.08.02L4.324 8.384a.75.75 0 111.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 01.02-.022z"/>
-                </svg>
+              <div v-if="isCompanyFromProject" class="auto-fill-tag">
+                来自项目
               </div>
             </div>
           </div>
@@ -358,7 +363,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { geoKeywordApi } from '@/services/api'
@@ -422,16 +427,29 @@ const currentProject = computed(() => {
   return projects.value.find(p => p.id === selectedProjectId.value) || null
 })
 
+// 检查关键词是否来自项目
+const isKeywordFromProject = computed(() => {
+  return currentProject.value &&
+    distillForm.value.keyword === currentProject.value.domain_keyword &&
+    currentProject.value.domain_keyword
+})
+
+// 检查公司名是否来自项目
+const isCompanyFromProject = computed(() => {
+  return currentProject.value &&
+    distillForm.value.company === currentProject.value.company_name &&
+    currentProject.value.company_name
+})
+
+// 检查是否有任何信息来自项目
+const isProjectSynced = computed(() => {
+  return isKeywordFromProject.value || isCompanyFromProject.value
+})
+
 const canDistill = computed(() => {
   return currentProject.value &&
     distillForm.value.keyword.trim() &&
     distillForm.value.company.trim()
-})
-
-const isSynced = computed(() => {
-  if (!currentProject.value) return false
-  return distillForm.value.keyword === currentProject.value.domain_keyword &&
-    distillForm.value.company === currentProject.value.company_name
 })
 
 const hasUnsaved = computed(() => {
@@ -470,14 +488,9 @@ const loadProjectKeywords = async () => {
   }
 }
 
-// 项目变化处理
+// 项目变化处理 - 填充表单并加载关键词
 const handleProjectChange = () => {
-  loadProjectKeywords()
-  results.value = []
-}
-
-// 监听项目变化，同步表单
-watch(() => currentProject.value, (project) => {
+  const project = projects.value.find(p => p.id === selectedProjectId.value)
   if (project) {
     distillForm.value.keyword = project.domain_keyword || ''
     distillForm.value.company = project.company_name || ''
@@ -486,7 +499,8 @@ watch(() => currentProject.value, (project) => {
     distillForm.value.company = ''
   }
   results.value = []
-}, { immediate: true })
+  loadProjectKeywords()
+}
 
 // 跳转到项目管理
 const goToProjects = () => {
@@ -803,6 +817,25 @@ onMounted(async () => {
 .distill-form {
   padding: 20px;
 
+  // 项目同步通知条
+  .sync-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #059669;
+
+    svg {
+      flex-shrink: 0;
+      color: #10b981;
+    }
+  }
+
   &.disabled {
     opacity: 0.6;
     pointer-events: none;
@@ -826,7 +859,7 @@ onMounted(async () => {
 
       .form-input {
         width: 100%;
-        padding: 12px 40px 12px 14px;
+        padding: 12px 90px 12px 14px;
         border: 1px solid #e5e7eb;
         border-radius: 10px;
         font-size: 14px;
@@ -843,17 +876,27 @@ onMounted(async () => {
           background: #f9fafb;
           cursor: not-allowed;
         }
+
+        &.synced {
+          background: rgba(16, 185, 129, 0.05);
+          border-color: #10b981;
+          color: #059669;
+        }
       }
 
-      .sync-badge {
+      // 自动填充标签 - 干净简洁的"来自项目"标签
+      .auto-fill-tag {
         position: absolute;
         right: 12px;
         top: 50%;
         transform: translateY(-50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #10b981;
+        padding: 4px 10px;
+        background: rgba(16, 185, 129, 0.1);
+        border-radius: 6px;
+        font-size: 12px;
+        color: #059669;
+        font-weight: 500;
+        pointer-events: none;
       }
     }
   }

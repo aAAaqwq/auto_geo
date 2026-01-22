@@ -1,0 +1,24 @@
+# n8n 工作流目录
+
+此目录用于存放 n8n 工作流 JSON 文件。
+
+## 工作流分类
+
+### AI 相关工作流
+- `keyword_distill.json` - 关键词蒸馏
+- `generate_questions.json` - 生成问题变体
+- `geo_article_generate.json` - GEO文章生成
+- `index_check_analysis.json` - 收录检测分析
+
+### 导入工作流
+1. 打开 n8n 界面
+2. 点击 "Import from File" 或 "Import from URL"
+3. 选择对应的 JSON 文件导入
+
+## Webhook 端点
+
+工作流部署后，会暴露 webhook 端点供后端调用：
+- `http://localhost:5678/webhook/keyword-distill`
+- `http://localhost:5678/webhook/generate-questions`
+- `http://localhost:5678/webhook/geo-article-generate`
+- `http://localhost:5678/webhook/index-check-analysis`

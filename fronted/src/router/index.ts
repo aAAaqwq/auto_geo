@@ -91,6 +91,20 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/geo/Monitor.vue'),
         meta: { title: '收录监控', icon: 'Monitor' },
       },
+      // ==================== 知识库管理路由 ====================
+      {
+        path: 'knowledge',
+        name: 'Knowledge',
+        component: () => import('@/views/knowledge/KnowledgePage.vue'),
+        meta: { title: '知识库管理', icon: 'Reading' },
+      },
+      // ==================== 定时任务管理路由 ====================
+      {
+        path: 'scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/scheduler/SchedulerPage.vue'),
+        meta: { title: '定时任务', icon: 'Timer' },
+      },
     ],
   },
 ]

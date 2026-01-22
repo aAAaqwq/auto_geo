@@ -42,5 +42,18 @@ export default defineConfig({
   build: {
     outDir: 'out/renderer',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vue 核心库
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          // Element Plus UI 库
+          'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          // ECharts 图表库
+          'echarts': ['echarts'],
+        },
+      },
+    },
   },
 })

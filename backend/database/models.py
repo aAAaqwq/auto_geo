@@ -239,3 +239,56 @@ class GeoArticle(Base):
 
     def __repr__(self):
         return f"<GeoArticle id={self.id} keyword_id={self.keyword_id}>"
+
+
+# ==================== 知识库相关表 ====================
+
+class KnowledgeCategory(Base):
+    """
+    知识库分类表（企业分类）
+    存储企业/客户的知识库分类信息
+    """
+    __tablename__ = "knowledge_categories"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    name = Column(String(200), nullable=False, comment="企业/分类名称")
+    industry = Column(String(100), nullable=True, comment="所属行业")
+    description = Column(Text, nullable=True, comment="分类描述")
+    tags = Column(String(500), nullable=True, comment="标签，逗号分隔")
+    color = Column(String(20), default="#6366f1", comment="主题颜色")
+
+    # 状态
+    status = Column(Integer, default=1, comment="状态：1=活跃 0=停用")
+
+    # 时间戳
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+
+    def __repr__(self):
+        return f"<KnowledgeCategory {self.name}>"
+
+
+class Knowledge(Base):
+    """
+    知识库条目表
+    存储企业相关的知识内容
+    """
+    __tablename__ = "knowledge_items"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    category_id = Column(Integer, ForeignKey("knowledge_categories.id", ondelete="CASCADE"), nullable=False, index=True, comment="分类ID")
+    title = Column(String(200), nullable=False, comment="知识标题")
+    content = Column(Text, nullable=False, comment="知识内容")
+    type = Column(String(50), default="other", comment="知识类型：company_intro=企业介绍 product=产品服务 industry=行业知识 faq=常见问题 other=其他")
+
+    # 状态
+    status = Column(Integer, default=1, comment="状态：1=启用 0=停用")
+
+    # 时间戳
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+
+    def __repr__(self):
+        return f"<Knowledge {self.title}>"
