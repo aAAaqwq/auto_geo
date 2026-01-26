@@ -320,6 +320,14 @@ export const reportsApi = {
   // 获取总览数据
   getOverview: () => get<any>('/reports/overview'),
 
+  // 获取全面数据概览（新增：包含文章、发布、收录等）
+  getComprehensiveOverview: (params?: { project_id?: number }) =>
+    get<any>('/reports/comprehensive', params),
+
+  // 获取每日趋势数据（新增：包含文章生成、发布、收录趋势）
+  getDailyTrends: (params?: { project_id?: number; days?: number }) =>
+    get<any>('/reports/daily-trends', params),
+
   // 获取收录趋势
   getIndexTrend: (params?: { project_id?: number; days?: number }) =>
     get<any>('/reports/trend/index', params),
@@ -334,6 +342,18 @@ export const reportsApi = {
 
   // 获取项目统计
   getProjectStats: (projectId: number) => get<any>(`/reports/stats/project/${projectId}`),
+
+  // 获取平台对比分析（新增）
+  getPlatformComparison: (params?: { project_id?: number; days?: number }) =>
+    get<any>('/reports/platform-comparison', params),
+
+  // 获取项目对比分析（新增）
+  getProjectComparison: (params?: { project_ids?: string; days?: number }) =>
+    get<any>('/reports/project-comparison', params),
+
+  // 获取TOP项目排行榜（新增）
+  getTopProjects: (params?: { project_id?: number; limit?: number }) =>
+    get<any>('/reports/top-projects', params),
 }
 
 // ==================== 预警通知 API ====================
