@@ -39,7 +39,7 @@ REAL_PLATFORMS = {
     },
     "toutiao": {
         "name": "今日头条",
-        "search_url": "https://so.toutiao.com/search?keyword=人工智能&pd=information",
+        "search_url": "https://so.toutiao.com/search?enable_druid_v2=1&keyword=人工智能&dvpf=pc&source=search_subtab_switch&pd=information&action_type=search_subtab_switch&page_num=0&search_id=&from=news&cur_tab_title=news",
     }
 }
 
@@ -155,6 +155,66 @@ class TestRealEnvironmentCollection:
         await browser.close()
         await playwright.stop()
 
+    async def _handle_login_popup(self, page):
+        """测试脚本中的弹窗检测"""
+        try:
+            # 2. 常见弹窗选择器
+            popup_selectors = [
+                ".Modal-wrapper", # 知乎登录弹窗
+                ".login-modal", 
+                ".captcha-box",
+                ".sign-flow-modal", # 知乎登录
+                "[class*='login-modal']", # 通用登录模态框
+                "[class*='LoginModal']",
+                ".SignFlow", # 知乎
+                ".Button.SignFlow-submitButton", # 知乎登录按钮
+                "iframe[src*='login']", # 登录 iframe
+                "#captcha-verify-image", # 验证码
+                "div[class*='captcha']", # 通用验证码容器
+                ".verify-bar-close", # 验证条关闭按钮
+            ]
+            
+            needs_login = False
+            for selector in popup_selectors:
+                if await page.query_selector(selector):
+                    if await page.is_visible(selector):
+                        needs_login = True
+                        print(f"⚠️ 发现登录弹窗选择器: {selector}")
+                        break
+            
+            # 3. 检查页面文本
+            if not needs_login:
+                try:
+                    title = await page.title()
+                    if "登录" in title or "安全验证" in title:
+                        needs_login = True
+                    else:
+                        js_check = """
+                            () => {
+                                const text = document.body.innerText;
+                                const keywords = ["登录后查看更多", "请登录", "扫码登录", "验证码", "安全验证", "注册/登录", "依次点击", "拖动滑块"];
+                                return keywords.some(k => text.includes(k));
+                            }
+                        """
+                        if await page.evaluate(js_check):
+                             needs_login = True
+                             print("⚠️ 页面文本包含登录关键词")
+                except Exception:
+                    pass
+            
+            if needs_login:
+                print("\n" + "!"*50)
+                print("检测到登录弹窗或验证码！")
+                print("请在 45 秒内手动完成登录/验证操作...")
+                print("!"*50 + "\n")
+                
+                # 给用户 45 秒时间手动操作
+                await page.wait_for_timeout(45000)
+                print("手动操作时间结束，继续执行...")
+                
+        except Exception as e:
+            print(f"登录检测异常: {e}")
+
     @pytest.mark.asyncio
     async def test_zhihu_real_search(self, real_browser):
         """
@@ -173,7 +233,15 @@ class TestRealEnvironmentCollection:
             viewport={"width": 1280, "height": 800},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         )
+        # 防止 WebDriver 检测
+        await context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+        
         page = await context.new_page()
+
 
         try:
             # 导航到知乎搜索页
@@ -181,6 +249,9 @@ class TestRealEnvironmentCollection:
             print(f"📌 访问 URL: {search_url}")
 
             await page.goto(search_url, wait_until="networkidle")
+            
+            # 检测登录弹窗
+            await self._handle_login_popup(page)
 
             # 增加延时，等待页面完全加载
             print("⏳ 等待页面加载...")
@@ -189,6 +260,9 @@ class TestRealEnvironmentCollection:
             # 滚动页面加载更多内容
             print("📜 滚动页面加载更多内容...")
             for i in range(3):
+                # 检测登录弹窗
+                await self._handle_login_popup(page)
+                
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(3000)  # 每次滚动后等待 3 秒
                 print(f"   滚动 {i + 1}/3 完成")
@@ -261,6 +335,16 @@ class TestRealEnvironmentCollection:
             # 验证结果
             assert len(articles) > 0, "应该抓取到至少一篇文章"
 
+        except Exception as e:
+            # 截图保存
+            import os
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            screenshot_path = f"tests/reports/screenshots/zhihu_error_{timestamp}.png"
+            os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+            await page.screenshot(path=screenshot_path)
+            print(f"\n❌ 发生异常，截图已保存: {screenshot_path}")
+            raise e
+
         finally:
             await page.wait_for_timeout(2000)  # 保持浏览器打开 2 秒，便于查看结果
             await context.close()
@@ -283,6 +367,13 @@ class TestRealEnvironmentCollection:
             viewport={"width": 1280, "height": 800},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         )
+        # 防止 WebDriver 检测
+        await context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+        
         page = await context.new_page()
 
         try:
@@ -291,14 +382,20 @@ class TestRealEnvironmentCollection:
             print(f"📌 访问 URL: {search_url}")
 
             await page.goto(search_url, wait_until="networkidle")
+            
+            # 增加延时，等待页面加载
+            print("⏳ 等待页面加载 (5s)...")
+            await page.wait_for_timeout(5000)
 
-            # 增加延时，等待页面完全加载
-            print("⏳ 等待页面加载...")
-            await page.wait_for_timeout(3000)
+            # 检测登录弹窗
+            await self._handle_login_popup(page)
 
             # 滚动页面加载更多内容
             print("📜 滚动页面加载更多内容...")
             for i in range(3):
+                # 检测登录弹窗
+                await self._handle_login_popup(page)
+                
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(3000)  # 每次滚动后等待 3 秒
                 print(f"   滚动 {i + 1}/3 完成")
@@ -372,6 +469,16 @@ class TestRealEnvironmentCollection:
 
             # 验证结果
             assert len(articles) >= 0, "头条搜索应该正常完成"
+
+        except Exception as e:
+            # 截图保存
+            import os
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            screenshot_path = f"tests/reports/screenshots/toutiao_error_{timestamp}.png"
+            os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+            await page.screenshot(path=screenshot_path)
+            print(f"\n❌ 发生异常，截图已保存: {screenshot_path}")
+            raise e
 
         finally:
             await page.wait_for_timeout(2000)  # 保持浏览器打开 2 秒，便于查看结果
@@ -746,6 +853,11 @@ class TestArticleCollectionAPI:
             assert "id" in platform
             assert "name" in platform
 
+        # 验证平台数据结构
+        for platform in result["platforms"]:
+            assert "id" in platform
+            assert "name" in platform
+
     def test_check_duplicate_api(self, backend_server):
         """测试去重检查 API"""
         data = {
@@ -1046,6 +1158,7 @@ class TestCollectFlowMocked:
             mock_mgr.start = AsyncMock()
             mock_mgr._browser = MagicMock()
 
+            # Mock 浏览器上下文
             mock_context = AsyncMock()
             mock_page = AsyncMock()
             mock_context.new_page = AsyncMock(return_value=mock_page)

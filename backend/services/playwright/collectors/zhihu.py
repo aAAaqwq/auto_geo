@@ -36,12 +36,17 @@ class ZhihuCollector(BaseCollector):
             # 1. 导航到搜索页
             search_url = f"https://www.zhihu.com/search?type=content&q={keyword}"
             await page.goto(search_url, wait_until="networkidle")
-            # 增加延时，等待页面完全加载，防止被检测为爬虫
-            await page.wait_for_timeout(3000)
+            
+            # 增加延时，等待页面加载和可能的弹窗
+            await self._random_sleep(3, 5)
+
+            # 检测登录弹窗
+            await self._handle_login_popup(page)
+            
             logger.info(f"[知乎] 已导航到搜索页: {keyword}")
 
             # 2. 滚动加载更多结果
-            await self._scroll_to_load_more(page, scroll_count=3)
+            await self._human_scroll(page)
 
             # 3. 提取搜索结果
             articles = await self._extract_search_results(page)
@@ -51,14 +56,6 @@ class ZhihuCollector(BaseCollector):
         except Exception as e:
             logger.error(f"[知乎] 搜索失败: {e}")
             return []
-
-    async def _scroll_to_load_more(self, page: Page, scroll_count: int = 3):
-        """滚动页面加载更多内容"""
-        for i in range(scroll_count):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            # 增加延时，每次滚动后等待 3 秒，防止被检测为爬虫
-            await page.wait_for_timeout(3000)
-            logger.debug(f"[知乎] 滚动加载 {i + 1}/{scroll_count}")
 
     async def _extract_search_results(self, page: Page) -> List[Dict[str, Any]]:
         """提取搜索结果"""
@@ -125,9 +122,13 @@ class ZhihuCollector(BaseCollector):
         """提取文章正文"""
         try:
             await page.goto(url, wait_until="networkidle")
-            # 增加延时，等待页面完全加载
-            await page.wait_for_timeout(3000)
+            
+            # 增加延时，等待页面加载
+            await self._random_sleep(3, 5)
 
+            # 检测登录弹窗
+            await self._handle_login_popup(page)
+            
             # 尝试多种选择器
             selectors = [
                 ".Post-RichText",

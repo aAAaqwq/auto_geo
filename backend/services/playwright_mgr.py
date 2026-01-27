@@ -106,6 +106,7 @@ class PlaywrightManager:
         launch_options = {
             "headless": False,
             "args": BROWSER_ARGS + [
+                "--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage",
                 "--disable-background-networking",
                 "--disable-background-timer-throttling",
