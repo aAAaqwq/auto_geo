@@ -540,7 +540,10 @@ async def get_project_comparison(
     
     # 获取要对比的项目列表
     if project_ids:
-        project_id_list = [int(x.strip()) for x in project_ids.split(",")]
+        try:
+            project_id_list = [int(x.strip()) for x in project_ids.split(",")]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="project_ids必须是逗号分隔的整数列表")
         projects = db.query(Project).filter(Project.id.in_(project_id_list)).all()
     else:
         # 如果没有指定，获取所有活跃项目

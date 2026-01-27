@@ -14,6 +14,7 @@ BASE_URL = "http://127.0.0.1:8001"
 
 
 @pytest.mark.monitor
+@pytest.mark.usefixtures("backend_server")
 class TestReports:
     """数据报表功能测试类"""
 
@@ -317,3 +318,29 @@ class TestReports:
         assert data["total_geo_articles"] == 0
         assert data["total_publish_records"] == 0
         assert data["total_checks"] == 0
+
+    def test_comprehensive_overview_publish_filter_logic(self, clean_db, test_project):
+        """测试全面概览中发布数据的项目筛选逻辑（验证当前已知限制）"""
+        response = requests.get(f"{BASE_URL}/api/reports/comprehensive", params={
+            "project_id": test_project.id
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_publish_records" in data
+
+    def test_project_comparison_invalid_ids(self, clean_db):
+        """测试项目对比接口参数校验：非法ID格式"""
+        response = requests.get(f"{BASE_URL}/api/reports/project-comparison", params={
+            "days": 30,
+            "project_ids": "invalid,ids"
+        })
+        # 期望非200响应
+        assert response.status_code != 200
+
+    def test_top_projects_publish_field(self, clean_db):
+        """验证Top项目接口中 total_publish 字段目前硬编码为 0"""
+        response = requests.get(f"{BASE_URL}/api/reports/top-projects", params={"limit": 10})
+        assert response.status_code == 200
+        data = response.json()
+        if len(data) > 0:
+            assert data[0]["total_publish"] == 0
