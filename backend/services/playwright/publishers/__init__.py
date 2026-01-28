@@ -9,6 +9,7 @@ from .zhihu import ZhihuPublisher
 from .baijiahao import BaijiahaoPublisher
 from .sohu import SohuPublisher
 from .toutiao import ToutiaoPublisher
+from .netease import NeteasePublisher
 
 
 def register_publishers(platforms_config):
@@ -28,6 +29,8 @@ def register_publishers(platforms_config):
             publisher = SohuPublisher(platform_id, config)
         elif platform_id == "toutiao":
             publisher = ToutiaoPublisher(platform_id, config)
+        elif platform_id == "netease":
+            publisher = NeteasePublisher(platform_id, config)
 
         if publisher:
             registry.register(platform_id, publisher)
@@ -44,4 +47,5 @@ __all__ = [
     "BaijiahaoPublisher",
     "SohuPublisher",
     "ToutiaoPublisher",
+    "NeteasePublisher",
 ]

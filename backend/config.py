@@ -103,6 +103,14 @@ PLATFORMS = {
         "publish_url": "https://mp.toutiao.com/profile/article/article_edit",
         "color": "#333333",
     },
+    "netease": {
+        "id": "netease",
+        "name": "网易号",
+        "code": "NT",
+        "login_url": "https://mp.163.com/",
+        "publish_url": "https://mp.163.com/upload/article",
+        "color": "#E60012",
+    },
 }
 
 # ==================== 日志配置 ====================

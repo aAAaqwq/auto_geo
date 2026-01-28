@@ -152,6 +152,30 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
     },
     limits: { titleLength: [5, 30], contentLength: [0, 50000], imageCount: 100 },
   },
+  netease: {
+    id: 'netease',
+    name: '网易号',
+    code: 'NT',
+    icon: 'netease.svg',
+    color: '#E60012',
+    features: { article: true, video: false, image: true, draft: true, schedule: true },
+    auth: {
+      type: 'qrcode',
+      loginUrl: 'https://mp.163.com/',
+      checkLoginInterval: 1000,
+      maxWaitTime: 120000,
+    },
+    publish: {
+      entryUrl: 'https://mp.163.com/upload/article',
+      selectors: {
+        title: 'input[placeholder*="标题"], .title-input',
+        content: '.editor-content, #ueditor_textarea',
+        submit: '.publish-btn, button[class*="publish"]',
+      },
+      waitTimes: { afterLoad: 2000, afterFill: 1000, afterSubmit: 3000 },
+    },
+    limits: { titleLength: [5, 40], contentLength: [0, 50000], imageCount: 50 },
+  },
 }
 
 /**
