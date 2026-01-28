@@ -18,7 +18,7 @@ from backend.schemas import (
 from backend.config import PLATFORMS
 from backend.services.playwright_mgr import playwright_mgr
 from backend.services.crypto import encrypt_cookies, encrypt_storage_state
-from backend.services.auth import get_current_user, is_admin
+from backend.services.auth import get_current_user, is_admin, get_owned_resource
 from loguru import logger
 
 
@@ -73,12 +73,7 @@ async def get_accounts(
 @router.get("/{account_id}", response_model=AccountDetailResponse)
 async def get_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取账号详情"""
-    query = db.query(Account).filter(Account.id == account_id)
-    if not is_admin(current_user):
-        query = query.filter(Account.owner_id == current_user.id)
-    account = query.first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     # 构建响应
     response = AccountDetailResponse(
@@ -133,12 +128,7 @@ async def update_account(
     current_user: User = Depends(get_current_user),
 ):
     """更新账号信息"""
-    query = db.query(Account).filter(Account.id == account_id)
-    if not is_admin(current_user):
-        query = query.filter(Account.owner_id == current_user.id)
-    account = query.first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     # 更新字段
     if account_data.account_name is not None:
@@ -162,12 +152,7 @@ async def delete_account(account_id: int, db: Session = Depends(get_db), current
 
     注意：删除会级联删除相关的发布记录！
     """
-    query = db.query(Account).filter(Account.id == account_id)
-    if not is_admin(current_user):
-        query = query.filter(Account.owner_id == current_user.id)
-    account = query.first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     db.delete(account)
     db.commit()

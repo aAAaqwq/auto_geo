@@ -14,7 +14,7 @@ from backend.services.index_check_service import IndexCheckService
 from backend.database.models import IndexCheckRecord, Keyword, User
 from backend.schemas import ApiResponse
 from loguru import logger
-from backend.services.auth import get_current_user, is_admin
+from backend.services.auth import get_current_user, is_admin, get_owned_resource
 
 
 router = APIRouter(prefix="/api/index-check", tags=["收录检测"])
@@ -117,10 +117,14 @@ async def get_records(
 
     注意：返回值按检测时间倒序！
     """
-    service = IndexCheckService(db)
-    records = service.get_check_records(keyword_id, platform, limit)
+    query = db.query(IndexCheckRecord)
     if not is_admin(current_user):
-        records = [r for r in records if r.owner_id == current_user.id]
+        query = query.filter(IndexCheckRecord.owner_id == current_user.id)
+    if keyword_id is not None:
+        query = query.filter(IndexCheckRecord.keyword_id == keyword_id)
+    if platform:
+        query = query.filter(IndexCheckRecord.platform == platform)
+    records = query.order_by(IndexCheckRecord.check_time.desc()).limit(limit).all()
     return records
 
 
@@ -146,12 +150,7 @@ async def get_hit_rate(keyword_id: int, db: Session = Depends(get_db), current_u
 @router.get("/records/{record_id}", response_model=RecordResponse)
 async def get_record(record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取检测记录详情"""
-    query = db.query(IndexCheckRecord).filter(IndexCheckRecord.id == record_id)
-    if not is_admin(current_user):
-        query = query.filter(IndexCheckRecord.owner_id == current_user.id)
-    record = query.first()
-    if not record:
-        raise HTTPException(status_code=404, detail="记录不存在")
+    record = get_owned_resource(IndexCheckRecord, record_id, db, current_user, "记录")
     return record
 
 
@@ -162,12 +161,7 @@ async def delete_record(record_id: int, db: Session = Depends(get_db), current_u
 
     注意：删除操作不可恢复！
     """
-    query = db.query(IndexCheckRecord).filter(IndexCheckRecord.id == record_id)
-    if not is_admin(current_user):
-        query = query.filter(IndexCheckRecord.owner_id == current_user.id)
-    record = query.first()
-    if not record:
-        raise HTTPException(status_code=404, detail="记录不存在")
+    record = get_owned_resource(IndexCheckRecord, record_id, db, current_user, "记录")
 
     db.delete(record)
     db.commit()

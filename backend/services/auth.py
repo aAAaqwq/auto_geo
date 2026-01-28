@@ -6,7 +6,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Type, TypeVar
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -110,6 +110,27 @@ def require_role(role: str):
 def is_admin(user: User) -> bool:
     """是否管理员"""
     return user.role == "admin"
+
+
+ModelType = TypeVar("ModelType")
+
+
+def get_owned_resource(
+    model: Type[ModelType],
+    resource_id: int,
+    db: Session,
+    current_user: User,
+    resource_name: Optional[str] = None,
+) -> ModelType:
+    """按 owner 过滤后获取资源（管理员不受限）"""
+    query = db.query(model).filter(model.id == resource_id)
+    if hasattr(model, "owner_id") and not is_admin(current_user):
+        query = query.filter(model.owner_id == current_user.id)
+    resource = query.first()
+    if not resource:
+        name = resource_name or getattr(model, "__name__", "资源")
+        raise HTTPException(status_code=404, detail=f"{name}不存在")
+    return resource
 
 
 def create_user(db: Session, username: str, password: str, role: str = "user", email: Optional[str] = None) -> User:

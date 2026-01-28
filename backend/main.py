@@ -23,7 +23,6 @@ from backend.config import (
     APP_NAME, APP_VERSION, DEBUG, HOST, PORT, RELOAD,
     CORS_ORIGINS, PLATFORMS
 )
-<<<<<<< HEAD
 from backend.database import init_db, get_db, engine
 from backend.api import account, article, publish, keywords, geo, index_check, reports, notifications, scheduler, knowledge, auth, users
 
