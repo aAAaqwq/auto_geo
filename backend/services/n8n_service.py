@@ -10,13 +10,15 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from backend.config import N8N_WEBHOOK_URL
+
 
 # ==================== 配置 ====================
 
 class N8nConfig:
     """n8n 配置"""
     # n8n webhook 基础地址
-    WEBHOOK_BASE = "http://localhost:5678/webhook"
+    WEBHOOK_BASE = N8N_WEBHOOK_URL
 
     # 超时配置
     TIMEOUT_SHORT = 30.0   # 简单任务超时
