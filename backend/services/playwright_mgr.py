@@ -219,6 +219,7 @@ class PlaywrightManager:
                     "sohu": ["SUV"],  # 搜狐：SUV是唯一设备标识
                     "toutiao": ["sessionid"],  # 头条：sessionid会话ID
                     "netease": ["NTES_SESS", "S_INFO"],  # 网易：核心登录凭证
+                    "wechat": ["data_ticket", "bizuin"],  # 微信：核心登录凭证
                 }
 
                 # 获取当前平台用于验证登录的关键cookies
@@ -235,6 +236,12 @@ class PlaywrightManager:
                     if not has_login_cookie:
                         logger.warning(f"[授权确认] 网易号未检测到登录cookie")
                         return '{"success": false, "message": "未检测到登录信息，请先在平台完成登录！"}'
+                elif task.platform == "wechat":
+                    # 微信登录校验逻辑
+                    has_login_cookie = any(name in cookie_names for name in ["bizuin", "data_ticket", "slave_sid"])
+                    if not has_login_cookie:
+                        logger.warning(f"[授权确认] 微信公众号未检测到登录cookie")
+                        return '{"success": false, "message": "未检测到登录信息，请先扫码登录！"}'
                 else:
                     missing_cookies = [name for name in check_cookies if name not in cookie_names]
                     if missing_cookies:
@@ -500,6 +507,11 @@ class PlaywrightManager:
                 url = page.url
                 return "index.html" in url or "upload" in url or "login" not in url
 
+            elif platform == "wechat":
+                # 微信：检查是否进入后台页面
+                url = page.url
+                return "cgi-bin/home" in url or "token=" in url
+
             else:
                 # 默认：检查URL是否变化
                 return "login" not in page.url
@@ -645,6 +657,28 @@ class PlaywrightManager:
                             if text and text.strip():
                                 username = text.strip()
                                 logger.info(f"[网易] 提取到用户名: {username}")
+                                return username
+                    except Exception:
+                        continue
+            elif platform == "wechat":
+                # 微信公众号
+                await asyncio.sleep(2)
+                
+                selectors = [
+                    ".weui-desktop-account__nickname",
+                    ".nickname",
+                    ".account_name",
+                    ".user_name",
+                    "[class*='nickname']"
+                ]
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            text = await element.text_content()
+                            if text and text.strip():
+                                username = text.strip()
+                                logger.info(f"[微信] 提取到用户名: {username}")
                                 return username
                     except Exception:
                         continue

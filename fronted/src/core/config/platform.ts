@@ -176,6 +176,30 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
     },
     limits: { titleLength: [5, 40], contentLength: [0, 50000], imageCount: 50 },
   },
+  wechat: {
+    id: 'wechat',
+    name: '微信公众号',
+    code: 'WX',
+    icon: 'wechat.svg',
+    color: '#07C160',
+    features: { article: true, video: true, image: true, draft: true, schedule: true },
+    auth: {
+      type: 'qrcode',
+      loginUrl: 'https://mp.weixin.qq.com/',
+      checkLoginInterval: 1000,
+      maxWaitTime: 120000,
+    },
+    publish: {
+      entryUrl: 'https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit&type=77',
+      selectors: {
+        title: '#title',
+        content: '#js_editor',
+        submit: '#js_submit, button[class*="submit"]',
+      },
+      waitTimes: { afterLoad: 4000, afterFill: 1000, afterSubmit: 5000 },
+    },
+    limits: { titleLength: [1, 64], contentLength: [0, 50000], imageCount: 100 },
+  },
 }
 
 /**

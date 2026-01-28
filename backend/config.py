@@ -111,6 +111,14 @@ PLATFORMS = {
         "publish_url": "https://mp.163.com/upload/article",
         "color": "#E60012",
     },
+    "wechat": {
+        "id": "wechat",
+        "name": "微信公众号",
+        "code": "WX",
+        "login_url": "https://mp.weixin.qq.com/",
+        "publish_url": "https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit&type=77",
+        "color": "#07C160",
+    },
 }
 
 # ==================== 日志配置 ====================
