@@ -220,6 +220,8 @@ class PlaywrightManager:
                     "toutiao": ["sessionid"],  # 头条：sessionid会话ID
                     "netease": ["NTES_SESS", "S_INFO"],  # 网易：核心登录凭证
                     "wechat": ["data_ticket", "bizuin"],  # 微信：核心登录凭证
+                    "people": ["token", "uid", "sid"],  # 人民号：核心登录凭证
+                    "sohu": ["ppinf", "pprdig", "SUV"],  # 搜狐：核心登录凭证
                 }
 
                 # 获取当前平台用于验证登录的关键cookies
@@ -242,6 +244,19 @@ class PlaywrightManager:
                     if not has_login_cookie:
                         logger.warning(f"[授权确认] 微信公众号未检测到登录cookie")
                         return '{"success": false, "message": "未检测到登录信息，请先扫码登录！"}'
+                elif task.platform == "people":
+                    # 人民号登录校验逻辑
+                    # 只要 URL 包含发布或后台路径，或者有任何 token 类的 cookie
+                    has_token = any("token" in name.lower() or "uid" in name.lower() for name in cookie_names)
+                    if not has_token and "login" in page.url:
+                        logger.warning(f"[授权确认] {task.platform} 未检测到登录信息")
+                        return f'{{"success": false, "message": "未检测到登录信息，请先在平台完成登录！"}}'
+                elif task.platform == "sohu":
+                    # 搜狐登录校验逻辑
+                    has_login_cookie = any(name in cookie_names for name in ["ppinf", "pprdig"])
+                    if not has_login_cookie:
+                        logger.warning(f"[授权确认] 搜狐号未检测到登录cookie")
+                        return '{"success": false, "message": "未检测到登录信息，请先完成登录！"}'
                 else:
                     missing_cookies = [name for name in check_cookies if name not in cookie_names]
                     if missing_cookies:
@@ -512,6 +527,16 @@ class PlaywrightManager:
                 url = page.url
                 return "cgi-bin/home" in url or "token=" in url
 
+            elif platform == "people":
+                # 人民号
+                url = page.url
+                return "publisher" in url or "producer" in url or "index" in url or "login" not in url
+
+            elif platform == "sohu":
+                # 搜狐
+                url = page.url
+                return "home/index" in url or "main/home" in url or "login" not in url
+
             else:
                 # 默认：检查URL是否变化
                 return "login" not in page.url
@@ -679,6 +704,49 @@ class PlaywrightManager:
                             if text and text.strip():
                                 username = text.strip()
                                 logger.info(f"[微信] 提取到用户名: {username}")
+                                return username
+                    except Exception:
+                        continue
+            elif platform == "people":
+                # 人民号
+                await asyncio.sleep(2)
+                
+                selectors = [
+                    ".user-name",
+                    ".nickname",
+                    ".account-name",
+                    ".name",
+                    "[class*='name']"
+                ]
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            text = await element.text_content()
+                            if text and text.strip():
+                                username = text.strip()
+                                logger.info(f"[{platform}] 提取到用户名: {username}")
+                                return username
+                    except Exception:
+                        continue
+
+            elif platform == "sohu":
+                # 搜狐
+                await asyncio.sleep(2)
+                selectors = [
+                    ".user-name",
+                    ".nick-name",
+                    "#username",
+                    ".account-info-name"
+                ]
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            text = await element.text_content()
+                            if text and text.strip():
+                                username = text.strip()
+                                logger.info(f"[sohu] 提取到用户名: {username}")
                                 return username
                     except Exception:
                         continue

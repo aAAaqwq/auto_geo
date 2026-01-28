@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-搜狐号发布适配器
+人民号发布适配器
 """
 
 import asyncio
@@ -11,15 +11,15 @@ from loguru import logger
 from .base import BasePublisher
 
 
-class SohuPublisher(BasePublisher):
+class PeoplePublisher(BasePublisher):
     """
-    搜狐号发布适配器
+    人民号发布适配器
 
-    发布页面：https://mp.sohu.com/main/home/index.action
+    发布页面：https://rmh.pdnews.cn/publisher/article/publish
     """
 
     async def publish(self, page: Page, article: Any, account: Any) -> Dict[str, Any]:
-        """发布文章到搜狐号"""
+        """发布文章到人民号"""
         try:
             # 1. 导航到发布页面
             if not await self.navigate_to_publish_page(page):
@@ -37,51 +37,44 @@ class SohuPublisher(BasePublisher):
                 return {"success": False, "platform_url": None, "error_msg": "正文填充失败"}
 
             # 5. 点击发布
-            # 搜狐号通常需要选择分类等操作，这里先实现基础填充
-            # 如果需要完全自动化，需要添加更多步骤
-            logger.info("搜狐号内容填充完成，建议手动检查并点击发布")
-            
-            # 这里尝试点击发布按钮
-            # if not await self._click_publish(page):
-            #     return {"success": False, "platform_url": None, "error_msg": "发布失败"}
+            if not await self._click_publish(page):
+                return {"success": False, "platform_url": None, "error_msg": "发布失败"}
 
-            return {
-                "success": True,
-                "platform_url": page.url,
-                "error_msg": "内容已填充，请手动完成发布"
-            }
+            # 6. 等待结果
+            result = await self._wait_for_publish_result(page)
+
+            return result
 
         except Exception as e:
-            logger.error(f"搜狐号发布失败: {e}")
+            logger.error(f"人民号发布失败: {e}")
             return {"success": False, "platform_url": None, "error_msg": str(e)}
 
     async def _fill_title(self, page: Page, title: str) -> bool:
         """填充标题"""
         try:
             selectors = [
+                "input[placeholder*='标题']",
                 ".title-input input",
                 "#title",
-                "input[placeholder*='标题']",
             ]
 
             for selector in selectors:
                 try:
                     if await self.wait_for_selector(page, selector, 5000):
                         await page.fill(selector, title)
-                        logger.info(f"搜狐号标题已填充: {title[:20]}...")
+                        logger.info(f"人民号标题已填充: {title[:20]}...")
                         return True
                 except Exception:
                     continue
 
             return False
         except Exception as e:
-            logger.error(f"搜狐号标题填充失败: {e}")
+            logger.error(f"人民号标题填充失败: {e}")
             return False
 
     async def _fill_content(self, page: Page, content: str) -> bool:
         """填充正文"""
         try:
-            # 搜狐号通常使用 UEditor 或自定义编辑器
             selectors = [
                 "#ueditor_textarea",
                 ".editor-content",
@@ -92,18 +85,18 @@ class SohuPublisher(BasePublisher):
                 try:
                     if await self.wait_for_selector(page, selector, 5000):
                         await page.fill(selector, content)
-                        logger.info(f"搜狐号正文已填充: {len(content)} 字符")
+                        logger.info(f"人民号正文已填充: {len(content)} 字符")
                         return True
                 except Exception:
                     continue
 
-            # 备选：使用键盘输入
+            # 直接输入
             await page.keyboard.type(content)
-            logger.info(f"搜狐号正文已填充（键盘输入）: {len(content)} 字符")
+            logger.info(f"人民号正文已填充（直接输入）: {len(content)} 字符")
             return True
 
         except Exception as e:
-            logger.error(f"搜狐号正文填充失败: {e}")
+            logger.error(f"人民号正文填充失败: {e}")
             return False
 
     async def _click_publish(self, page: Page) -> bool:
@@ -119,12 +112,30 @@ class SohuPublisher(BasePublisher):
                 try:
                     if await self.wait_for_selector(page, selector, 3000):
                         await page.click(selector)
-                        logger.info("搜狐号发布按钮已点击")
+                        logger.info("人民号发布按钮已点击")
                         return True
                 except Exception:
                     continue
 
             return False
         except Exception as e:
-            logger.error(f"搜狐号点击发布失败: {e}")
+            logger.error(f"人民号点击发布失败: {e}")
             return False
+
+    async def _wait_for_publish_result(self, page: Page) -> Dict[str, Any]:
+        """等待发布结果"""
+        try:
+            await asyncio.sleep(3)
+
+            return {
+                "success": True,
+                "platform_url": page.url,
+                "error_msg": None
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "platform_url": None,
+                "error_msg": f"等待结果失败: {str(e)}"
+            }

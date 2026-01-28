@@ -200,6 +200,54 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
     },
     limits: { titleLength: [1, 64], contentLength: [0, 50000], imageCount: 100 },
   },
+  people: {
+    id: 'people',
+    name: '人民号',
+    code: 'RM',
+    icon: 'people.svg',
+    color: '#C62828',
+    features: { article: true, video: true, image: true, draft: true, schedule: true },
+    auth: {
+      type: 'qrcode',
+      loginUrl: 'https://pdcreator.pdnews.cn/login?service=https%3A%2F%2Fpdcreator.pdnews.cn%2Fproducer',
+      checkLoginInterval: 1000,
+      maxWaitTime: 120000,
+    },
+    publish: {
+      entryUrl: 'https://pdcreator.pdnews.cn/producer',
+      selectors: {
+        title: 'input[placeholder*="标题"]',
+        content: '.editor-content, #ueditor_textarea',
+        submit: '.publish-btn, button[class*="publish"]',
+      },
+      waitTimes: { afterLoad: 3000, afterFill: 1000, afterSubmit: 5000 },
+    },
+    limits: { titleLength: [5, 50], contentLength: [0, 50000], imageCount: 100 },
+  },
+  sohu: {
+    id: 'sohu',
+    name: '搜狐号',
+    code: 'SH',
+    icon: 'sohu.svg',
+    color: '#FFD600',
+    features: { article: true, video: true, image: true, draft: true, schedule: true },
+    auth: {
+      type: 'qrcode',
+      loginUrl: 'https://mp.sohu.com/',
+      checkLoginInterval: 1000,
+      maxWaitTime: 120000,
+    },
+    publish: {
+      entryUrl: 'https://mp.sohu.com/main/home/index.action',
+      selectors: {
+        title: '.title-input input, #title',
+        content: '#ueditor_textarea, .editor-content',
+        submit: '.publish-btn, button:has-text("发布")',
+      },
+      waitTimes: { afterLoad: 3000, afterFill: 1000, afterSubmit: 5000 },
+    },
+    limits: { titleLength: [5, 60], contentLength: [0, 50000], imageCount: 100 },
+  },
 }
 
 /**

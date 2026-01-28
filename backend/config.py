@@ -119,6 +119,22 @@ PLATFORMS = {
         "publish_url": "https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit&type=77",
         "color": "#07C160",
     },
+    "people": {
+        "id": "people",
+        "name": "人民号",
+        "code": "RM",
+        "login_url": "https://pdcreator.pdnews.cn/login?service=https%3A%2F%2Fpdcreator.pdnews.cn%2Fproducer",
+        "publish_url": "https://pdcreator.pdnews.cn/producer",
+        "color": "#C62828",
+    },
+    "sohu": {
+        "id": "sohu",
+        "name": "搜狐号",
+        "code": "SH",
+        "login_url": "https://mp.sohu.com/",
+        "publish_url": "https://mp.sohu.com/main/home/index.action",
+        "color": "#FFD600",
+    },
 }
 
 # ==================== 日志配置 ====================
