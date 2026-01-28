@@ -66,6 +66,7 @@ class GeoArticleService:
 
         # 保存文章到数据库
         article = GeoArticle(
+            owner_id=keyword_obj.owner_id,
             keyword_id=keyword_id,
             title=result.get("title"),
             content=result.get("content"),

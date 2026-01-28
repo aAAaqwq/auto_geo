@@ -21,7 +21,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from backend.database import SessionLocal, init_db
-from backend.database.models import Account, Article, PublishRecord, Project, Keyword
+from backend.database.models import Account, Article, PublishRecord, Project, Keyword, User, RefreshToken, AuditLog
 
 
 # ==================== 配置 ====================
@@ -86,6 +86,9 @@ def clean_db(db):
     db.query(Keyword).delete()
     db.query(Project).delete()
     db.query(Account).delete()
+    db.query(RefreshToken).delete()
+    db.query(AuditLog).delete()
+    db.query(User).delete()
     db.commit()
 
 

@@ -10,9 +10,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.database.models import KnowledgeCategory, Knowledge
+from backend.database.models import KnowledgeCategory, Knowledge, User, Project
 from backend.schemas import ApiResponse
 from loguru import logger
+from backend.services.auth import get_current_user, is_admin
 
 
 router = APIRouter(prefix="/api/knowledge", tags=["知识库管理"])
@@ -83,7 +84,8 @@ class KnowledgeResponse(BaseModel):
 @router.get("/categories", response_model=List[KnowledgeCategoryResponse])
 async def get_categories(
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取知识库分类列表
@@ -96,6 +98,8 @@ async def get_categories(
         分类列表
     """
     query = db.query(KnowledgeCategory).filter(KnowledgeCategory.status == 1)
+    if not is_admin(current_user):
+        query = query.filter(KnowledgeCategory.owner_id == current_user.id)
 
     if search:
         query = query.filter(
@@ -115,11 +119,13 @@ async def get_categories(
         ).count()
 
         # 统计关联项目数（根据行业匹配）
-        from backend.database.models import Project
-        project_count = db.query(Project).filter(
+        project_query = db.query(Project).filter(
             Project.industry == cat.industry,
             Project.status == 1
-        ).count() if cat.industry else 0
+        )
+        if not is_admin(current_user):
+            project_query = project_query.filter(Project.owner_id == current_user.id)
+        project_count = project_query.count() if cat.industry else 0
 
         result.append(KnowledgeCategoryResponse(
             id=cat.id,
@@ -140,7 +146,8 @@ async def get_categories(
 @router.post("/categories", response_model=ApiResponse)
 async def create_category(
     data: KnowledgeCategoryCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建知识库分类
@@ -159,6 +166,7 @@ async def create_category(
             description=data.description,
             tags=data.tags,
             color=data.color,
+            owner_id=current_user.id,
         )
         db.add(category)
         db.commit()
@@ -175,7 +183,8 @@ async def create_category(
 async def update_category(
     category_id: int,
     data: KnowledgeCategoryUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新知识库分类
@@ -189,9 +198,10 @@ async def update_category(
         更新结果
     """
     try:
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == category_id
-        ).first()
+        query = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == category_id)
+        if not is_admin(current_user):
+            query = query.filter(KnowledgeCategory.owner_id == current_user.id)
+        category = query.first()
 
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
@@ -220,7 +230,8 @@ async def update_category(
 @router.delete("/categories/{category_id}", response_model=ApiResponse)
 async def delete_category(
     category_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     删除知识库分类
@@ -233,9 +244,10 @@ async def delete_category(
         删除结果
     """
     try:
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == category_id
-        ).first()
+        query = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == category_id)
+        if not is_admin(current_user):
+            query = query.filter(KnowledgeCategory.owner_id == current_user.id)
+        category = query.first()
 
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
@@ -259,7 +271,8 @@ async def delete_category(
 async def get_knowledge_list(
     category_id: int,
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取指定分类的知识列表
@@ -272,6 +285,13 @@ async def get_knowledge_list(
     Returns:
         知识条目列表
     """
+    cat_query = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == category_id)
+    if not is_admin(current_user):
+        cat_query = cat_query.filter(KnowledgeCategory.owner_id == current_user.id)
+    category = cat_query.first()
+    if not category:
+        raise HTTPException(status_code=404, detail="分类不存在")
+
     query = db.query(Knowledge).filter(
         Knowledge.category_id == category_id,
         Knowledge.status == 1
@@ -302,7 +322,8 @@ async def get_knowledge_list(
 @router.post("/knowledge", response_model=ApiResponse)
 async def create_knowledge(
     data: KnowledgeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建知识条目
@@ -316,9 +337,10 @@ async def create_knowledge(
     """
     try:
         # 验证分类存在
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == data.category_id
-        ).first()
+        cat_query = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == data.category_id)
+        if not is_admin(current_user):
+            cat_query = cat_query.filter(KnowledgeCategory.owner_id == current_user.id)
+        category = cat_query.first()
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
 
@@ -327,6 +349,7 @@ async def create_knowledge(
             title=data.title,
             content=data.content,
             type=data.type,
+            owner_id=current_user.id,
         )
         db.add(knowledge)
         db.commit()
@@ -345,7 +368,8 @@ async def create_knowledge(
 async def update_knowledge(
     knowledge_id: int,
     data: KnowledgeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新知识条目
@@ -359,9 +383,10 @@ async def update_knowledge(
         更新结果
     """
     try:
-        knowledge = db.query(Knowledge).filter(
-            Knowledge.id == knowledge_id
-        ).first()
+        query = db.query(Knowledge).filter(Knowledge.id == knowledge_id)
+        if not is_admin(current_user):
+            query = query.filter(Knowledge.owner_id == current_user.id)
+        knowledge = query.first()
 
         if not knowledge:
             raise HTTPException(status_code=404, detail="知识不存在")
@@ -386,7 +411,8 @@ async def update_knowledge(
 @router.delete("/knowledge/{knowledge_id}", response_model=ApiResponse)
 async def delete_knowledge(
     knowledge_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     删除知识条目
@@ -399,9 +425,10 @@ async def delete_knowledge(
         删除结果
     """
     try:
-        knowledge = db.query(Knowledge).filter(
-            Knowledge.id == knowledge_id
-        ).first()
+        query = db.query(Knowledge).filter(Knowledge.id == knowledge_id)
+        if not is_admin(current_user):
+            query = query.filter(Knowledge.owner_id == current_user.id)
+        knowledge = query.first()
 
         if not knowledge:
             raise HTTPException(status_code=404, detail="知识不存在")
@@ -421,7 +448,8 @@ async def delete_knowledge(
 @router.get("/knowledge/search", response_model=List[KnowledgeResponse])
 async def search_knowledge(
     keyword: str = Query(..., min_length=1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     全局搜索知识
@@ -433,11 +461,14 @@ async def search_knowledge(
     Returns:
         知识条目列表
     """
-    items = db.query(Knowledge).filter(
+    query = db.query(Knowledge).filter(
         Knowledge.status == 1,
         (Knowledge.title.like(f"%{keyword}%")) |
         (Knowledge.content.like(f"%{keyword}%"))
-    ).order_by(Knowledge.updated_at.desc()).limit(50).all()
+    )
+    if not is_admin(current_user):
+        query = query.filter(Knowledge.owner_id == current_user.id)
+    items = query.order_by(Knowledge.updated_at.desc()).limit(50).all()
 
     return [
         KnowledgeResponse(

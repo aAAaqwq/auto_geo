@@ -29,12 +29,14 @@ class AuthTask:
         self,
         platform: str,
         account_id: Optional[int] = None,
-        account_name: Optional[str] = None
+        account_name: Optional[str] = None,
+        owner_id: Optional[int] = None,
     ):
         self.task_id = str(uuid.uuid4())
         self.platform = platform
         self.account_id = account_id
         self.account_name = account_name
+        self.owner_id = owner_id
         self.status = "pending"  # pending, running, success, failed, timeout
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
@@ -147,7 +149,8 @@ class PlaywrightManager:
         self,
         platform: str,
         account_id: Optional[int] = None,
-        account_name: Optional[str] = None
+        account_name: Optional[str] = None,
+        owner_id: Optional[int] = None,
     ) -> AuthTask:
         """
         创建授权任务
@@ -170,7 +173,7 @@ class PlaywrightManager:
         if platform not in PLATFORMS:
             raise ValueError(f"不支持的平台: {platform}")
 
-        task = AuthTask(platform, account_id, account_name)
+        task = AuthTask(platform, account_id, account_name, owner_id)
         self._auth_tasks[task.task_id] = task
 
         platform_config = PLATFORMS[platform]
@@ -275,6 +278,7 @@ class PlaywrightManager:
                         # 创建新账号
                         account_name_to_use = task.account_name or f"{PLATFORMS[task.platform]['name']}账号"
                         account = Account(
+                            owner_id=task.owner_id,
                             platform=task.platform,
                             account_name=account_name_to_use,
                             username=username,  # 新增：保存用户名
@@ -429,6 +433,7 @@ class PlaywrightManager:
                 # 创建新账号
                 account_name = task.account_name or f"{PLATFORMS[task.platform]['name']}账号"
                 account = Account(
+                    owner_id=task.owner_id,
                     platform=task.platform,
                     account_name=account_name,
                     cookies=encrypt_cookies(task.cookies),

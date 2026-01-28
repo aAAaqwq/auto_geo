@@ -46,6 +46,12 @@ ENCRYPTION_KEY = os.getenv(
     "auto-geo-default-key-32-bytes-length!!"  # 32字节密钥
 ).encode()[:32]  # 确保是32字节
 
+# ==================== 认证配置 ====================
+JWT_SECRET = os.getenv("AUTO_GEO_JWT_SECRET", "auto-geo-dev-secret")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("AUTO_GEO_ACCESS_TOKEN_MINUTES", "30"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("AUTO_GEO_REFRESH_TOKEN_DAYS", "7"))
+
 # ==================== Playwright配置 ====================
 # 浏览器类型
 BROWSER_TYPE: Literal["chromium", "firefox", "webkit"] = "chromium"
