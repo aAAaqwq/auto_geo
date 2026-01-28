@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import IntEnum
+from enum import Enum
 
 # 导入平台配置（忘记导出了！）
 # 注意：这里不能用相对导入，因为schemas会被作为独立模块导入
@@ -36,6 +37,12 @@ class ArticleStatus(IntEnum):
     PUBLISHED = 1  # 已发布
 
 
+class UserRole(str, Enum):
+    """用户角色"""
+    ADMIN = "admin"
+    USER = "user"
+
+
 # ==================== 通用响应 ====================
 class ApiResponse(BaseModel):
     """统一API响应格式"""
@@ -51,6 +58,62 @@ class ErrorResponse(BaseModel):
     error: Optional[str] = None
     message: str = "操作失败"
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# ==================== 用户/认证相关 ====================
+class UserBase(BaseModel):
+    """用户基础信息"""
+    username: str = Field(..., min_length=3, max_length=100)
+    email: Optional[str] = Field(None, max_length=200)
+    role: UserRole = UserRole.USER
+    status: str = Field("active", pattern="^(active|disabled)$")
+
+
+class UserCreate(UserBase):
+    """创建用户请求"""
+    password: str = Field(..., min_length=8, max_length=100)
+
+
+class UserUpdate(BaseModel):
+    """更新用户请求"""
+    email: Optional[str] = Field(None, max_length=200)
+    role: Optional[UserRole] = None
+    status: Optional[str] = Field(None, pattern="^(active|disabled)$")
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
+
+
+class UserResponse(UserBase):
+    """用户响应"""
+    id: int
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LoginRequest(BaseModel):
+    """登录请求"""
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    """令牌响应"""
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    """刷新令牌请求"""
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    """登出请求"""
+    refresh_token: str
 
 
 # ==================== 账号相关 ====================
