@@ -59,6 +59,43 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label label-badge">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14">
+              <path d="M6.5 2a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h1zm3 0a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h1z"/>
+            </svg>
+            用户自定义前缀
+          </label>
+          <div class="input-wrapper">
+            <input
+              v-model="distillForm.prefixes"
+              type="text"
+              class="form-input"
+              placeholder="如：北京 专业 靠谱"
+              :disabled="!currentProject"
+              @keyup.enter="startDistill"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label label-badge">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14">
+              <path d="M6.5 2a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h1zm3 0a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h1z"/>
+            </svg>
+            用户自定义后缀
+          </label>
+          <div class="input-wrapper">
+            <input
+              v-model="distillForm.suffixes"
+              type="text"
+              class="form-input"
+              placeholder="如：哪家好 厂家 服务商"
+              :disabled="!currentProject"
+              @keyup.enter="startDistill"
+            >
+          </div>
+        </div>
         <!-- 蒸馏输入表单 -->
         <div class="distill-form" :class="{ disabled: !currentProject }">
           <!-- 项目同步状态提示 -->
@@ -417,6 +454,8 @@ const currentKeyword = ref<Keyword | null>(null)
 const distillForm = ref({
   keyword: '',
   company: '',
+  prefixes: '',
+  suffixes: '',
 })
 
 const results = ref<DistillResult[]>([])
@@ -518,24 +557,33 @@ const startDistill = async () => {
   try {
     const result = await geoKeywordApi.distill({
       project_id: selectedProjectId.value!,
+      keyword: distillForm.value.keyword,
       company_name: distillForm.value.company,
       industry: currentProject.value?.industry || '',
       description: currentProject.value?.description || '',
-      count: 5,
+      count: 50,
+      prefixes: distillForm.value.prefixes,
+      suffixes: distillForm.value.suffixes,
     })
 
     if (result.success && result.data?.keywords) {
       const kwList = result.data.keywords
       for (const kw of kwList) {
-        const questionsResult = await geoKeywordApi.generateQuestions({
-          keyword_id: kw.id,
-          count: 3,
-        })
+        let questions: string[] = []
+        try {
+          const questionsResult = await geoKeywordApi.generateQuestions({
+            keyword_id: kw.id,
+            count: 3,
+          })
+          questions = questionsResult.data?.questions?.map((q: any) => q.question) || []
+        } catch (e) {
+          questions = []
+        }
 
         results.value.push({
           id: kw.id.toString(),
           keyword: kw.keyword,
-          questions: questionsResult.data?.questions?.map((q: any) => q.question) || [],
+          questions,
           saved: true,
         })
       }
@@ -679,6 +727,18 @@ onMounted(async () => {
   height: 100%;
   padding: 24px;
   background: linear-gradient(135deg, #f8f9fc 0%, #f0f2f8 100%);
+}
+
+.form-label.label-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.08) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  border-radius: 8px;
+  color: #059669 !important;
+  font-weight: 600;
 }
 
 // 头部
@@ -864,6 +924,7 @@ onMounted(async () => {
         border-radius: 10px;
         font-size: 14px;
         color: #1a1f36;
+        background: #ffffff;
         transition: all 0.2s;
 
         &:focus {
