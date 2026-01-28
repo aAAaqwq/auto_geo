@@ -21,6 +21,7 @@ sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 # 导入配置和数据库
@@ -157,6 +158,11 @@ app.include_router(reports.router)
 app.include_router(notifications.router)
 app.include_router(scheduler.router)
 app.include_router(knowledge.router)  # 同事新增的知识库
+
+# 静态文件
+static_path = Path(__file__).parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 
 # ==================== WebSocket 端点 ====================

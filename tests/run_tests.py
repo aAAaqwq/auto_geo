@@ -74,12 +74,12 @@ def run_tests(args):
     ]
 
     # 添加HTML报告
-    if args.hl:
+    if args.html:
         report_dir = project_root / "tests" / "reports"
         report_dir.mkdir(parents=True, exist_ok=True)
         pytest_args.extend([
-            f"--hl={report_dir}/report.hl",
-            "--self-contained-hl"
+            f"--html={report_dir}/report.html",
+            "--self-contained-html"
         ])
 
     # 添加标记过滤
@@ -108,7 +108,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="AutoGeo 测试运行器")
     parser.add_argument("--no-dep-check", action="store_true", help="跳过依赖检查")
-    parser.add_argument("--hl", action="store_true", help="生成HTML报告")
+    parser.add_argument("--html", action="store_true", help="生成HTML报告")
     parser.add_argument("-m", "--marker", help="按标记过滤测试 (geo/monitor/publish)")
     parser.add_argument("-p", "--path", help="指定测试文件/目录")
     parser.add_argument("-v", "--verbose", action="store_true", help="更详细的输出")
@@ -140,7 +140,7 @@ def main():
         print("[OK] 所有测试通过！")
     else:
         print(f"[FAIL] 测试失败，退出码: {exit_code}")
-        print("📄 查看详细报告: tests/reports/report.hl")
+        print("📄 查看详细报告: tests/reports/report.html")
 
     print("=" * 50)
 

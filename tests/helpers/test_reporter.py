@@ -199,7 +199,7 @@ class TestReporter:
 
         return json_path
 
-    def generate_hl(self) -> str:
+    def generate_html(self) -> str:
         """
         生成HTML报告
 
@@ -216,8 +216,8 @@ class TestReporter:
         total_duration = sum(s.total_duration for s in self.suites)
         overall_pass_rate = f"{(total_passed / total_tests * 100):.1f}%" if total_tests > 0 else "0%"
 
-        hl_content = f"""<!DOCTYPE hl>
-<hl lang="zh-CN">
+        html_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -492,7 +492,7 @@ class TestReporter:
 
         # 生成每个测试套件
         for suite in self.suites:
-            hl_content += f"""
+            html_content += f"""
             <div class="suite">
                 <div class="suite-header" onclick="toggleSuite(this)">
                     <div class="suite-title">{suite.name}</div>
@@ -511,7 +511,7 @@ class TestReporter:
                 status_class = test.status
                 status_icon = "✓" if test.status == "pass" else ("✗" if test.status == "fail" else "-")
 
-                hl_content += f"""
+                html_content += f"""
                     <div class="test-item {status_class}">
                         <div class="test-status">{status_icon}</div>
                         <div class="test-info">
@@ -521,7 +521,7 @@ class TestReporter:
 
                 # 添加错误信息
                 if test.status == "fail" and test.error_message:
-                    hl_content += f"""
+                    html_content += f"""
                             <div class="test-error">{test.error_message}</div>
 """
 
@@ -529,7 +529,7 @@ class TestReporter:
                 if test.screenshot_path:
                     # 转换为相对路径
                     rel_path = Path(test.screenshot_path).relative_to(self.report_dir)
-                    hl_content += f"""
+                    html_content += f"""
                             <div class="test-screenshot">
                                 <img src="{rel_path}" alt="失败截图">
                             </div>
@@ -537,30 +537,30 @@ class TestReporter:
 
                 # 添加控制台错误
                 if test.console_errors:
-                    hl_content += """
+                    html_content += """
                             <div class="console-errors">
                                 <h4>控制台错误:</h4>
                                 <ul>
 """
                     for error in test.console_errors:
-                        hl_content += f"                                    <li>{error}</li>\n"
-                    hl_content += """
+                        html_content += f"                                    <li>{error}</li>\n"
+                    html_content += """
                                 </ul>
                             </div>
 """
 
-                hl_content += """
+                html_content += """
                         </div>
                     </div>
 """
 
-            hl_content += """
+            html_content += """
                 </div>
             </div>
 """
 
         # 添加JavaScript和结尾
-        hl_content += f"""
+        html_content += f"""
         </div>
 
         <div class="footer">
@@ -587,17 +587,17 @@ class TestReporter:
         }});
     </script>
 </body>
-</hl>
+</html>
 """
 
         # 保存HTML报告
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        hl_path = self.report_dir / f"report_{timestamp}.hl"
+        html_path = self.report_dir / f"report_{timestamp}.html"
 
-        with open(hl_path, "w", encoding="utf-8") as f:
-            f.write(hl_content)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
 
-        return str(hl_path)
+        return str(html_path)
 
 
 # 便捷函数

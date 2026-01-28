@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 说明 |
 |-----|------|------|
+| v2.1.0 | 2026-01-28 | **账号授权修复与系统优化** - 修复授权页无法显示及 Windows 端口冲突问题 |
 | v1.3 | 2026-01-26 | **知乎发布修复** - 修复标题填充失败和图片上传缺失问题 |
 | v1.2 | 2026-01-10 | **百家号弹窗关闭修复** - 修复新手教程弹窗×按钮点击问题 |
 | v1.1 | 2025-01-09 | **手动授权确认功能** - 移除自动检测，用户点击按钮确认 |
@@ -149,18 +150,18 @@ E:\CodingPlace\AI\auto_geo/
 
 ### 后端启动
 ```bash
-cd E:\CodingPlace\AI\auto_geo\backend
+cd backend
 python -m pip install -r requirements.txt
 python main.py
-# 服务地址: http://127.0.0.1:8000
+# 服务地址: http://127.0.0.1:8001
 ```
 
 ### 前端启动
 ```bash
-cd E:\CodingPlace\AI\auto_geo\fronted
+cd fronted
 npm install
 npm run dev
-# 开发服务器: http://localhost:5173
+# 开发服务器: http://localhost:5500 (避开 Windows 端口排除范围)
 ```
 
 ## 技术栈

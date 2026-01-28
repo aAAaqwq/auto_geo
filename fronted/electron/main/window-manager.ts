@@ -48,7 +48,7 @@ export function createMainWindow(): BrowserWindow {
     mainWindow.webContents.openDevTools() // 打开开发者工具
   } else {
     // 生产模式：加载构建后的文件
-    mainWindow.loadFile(join(__dirname, '../renderer/index.hl'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
   // 窗口准备好后显示（避免白屏）

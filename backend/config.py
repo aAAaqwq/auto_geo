@@ -29,6 +29,8 @@ RELOAD = False  # 修复：Windows 上 Playwright 需要 ProactorEventLoop，与
 
 # CORS配置
 CORS_ORIGINS = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
     "http://localhost:5179",
     "http://localhost:5173",
     "http://127.0.0.1:5173",

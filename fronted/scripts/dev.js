@@ -15,7 +15,7 @@ const fs = require('fs')
 const rootDir = path.join(__dirname, '..')
 
 // 设置环境变量
-process.env.ELECTRON_RENDERER_URL = 'http://localhost:5173'
+process.env.ELECTRON_RENDERER_URL = 'http://localhost:5500'
 
 let viteProcess = null
 let electronProcess = null
@@ -81,7 +81,7 @@ setTimeout(() => {
     shell: true,
     stdio: 'inherit',
     cwd: rootDir,
-    env: { ...process.env, ELECTRON_RENDERER_URL: 'http://localhost:5173' }
+    env: { ...process.env, ELECTRON_RENDERER_URL: 'http://localhost:5500' }
   })
 
   electronProcess.on('error', (err) => {

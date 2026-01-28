@@ -18,8 +18,9 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from backend.config import (
-    BROWSER_TYPE, BROWSER_ARGS,
-    LOGIN_CHECK_INTERVAL, LOGIN_MAX_WAIT_TIME, PLATFORMS
+    BROWSER_TYPE, BROWSER_ARGS, USER_DATA_DIR,
+    LOGIN_CHECK_INTERVAL, LOGIN_MAX_WAIT_TIME, PLATFORMS,
+    HOST, PORT
 )
 from backend.services.crypto import encrypt_cookies, encrypt_storage_state, decrypt_cookies, decrypt_storage_state
 # 注意：这里我们只导入 registry，具体的发布器注册逻辑通常在应用启动时完成
@@ -196,18 +197,10 @@ class PlaywrightManager:
         task.page = login_page
         await login_page.goto(platform_config["login_url"], wait_until="domcontentloaded")
 
-        # Tab 2: 打开本地控制页
-        # 假设 static 目录在 backend 下
-        static_dir = Path(__file__).parent.parent / "static"
-        control_page_path = static_dir / "auth_confirm.html"
+        # 第二个标签页：打开本地HTML控制页
+        # 修复：使用 HTTP URL 代替 file:///，更可靠且解决了拼写错误问题
+        control_page_url = f"http://{HOST}:{PORT}/static/auth_confirm.html?task_id={task.task_id}&platform={platform}"
 
-        # 兼容性处理：如果找不到文件，使用内置HTML
-        if not control_page_path.exists():
-            logger.warning(f"控制页模板未找到: {control_page_path}")
-            # 这里可以考虑写入一个临时文件或者直接用 data:text/html
-            # 为了简单，我们假设文件存在。实际部署时请确保 backend/static/auth_confirm.html 存在。
-
-        control_page_url = f"file:///{control_page_path.as_posix()}?task_id={task.task_id}&platform={platform}"
         control_page = await context.new_page()
         try:
             await control_page.goto(control_page_url)

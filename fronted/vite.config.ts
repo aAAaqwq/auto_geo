@@ -25,10 +25,9 @@ export default defineConfig({
     },
   },
   server: {
-    // 🌟 修复点 1：将 host 设为 0.0.0.0 以获得更好的本地兼容性
-    host: '0.0.0.0', 
-    port: 5173,
-    strictPort: true, 
+    host: '127.0.0.1', // 修复：强制 IPv4，Electron 才能连上
+    port: 5500,
+    strictPort: true, // 修复：端口被占用时报错而不是跳到下一个
     proxy: {
       // 🌟 修复点 2：优化 API 代理配置
       '/api': {
