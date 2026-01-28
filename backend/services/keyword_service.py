@@ -34,7 +34,10 @@ class KeywordService:
         company_name: str,
         industry: str,
         description: str,
-        count: int = 10
+        count: int = 10,
+        core_kw: Optional[str] = None,
+        prefixes: Optional[str] = None,
+        suffixes: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         蒸馏关键词
@@ -48,23 +51,48 @@ class KeywordService:
         Returns:
             包含关键词列表的字典
         """
-        logger.info(f"开始关键词蒸馏: {company_name} - {industry}")
-
-        # 调用n8n工作流
-        result = await self.n8n.call("distill-keywords", {
-            "company_name": company_name,
-            "industry": industry,
-            "description": description,
-            "count": count
-        })
+        logger.info(
+            f"开始关键词蒸馏: company={company_name}, core_kw={core_kw or industry}, "
+            f"industry={industry or ''}, description_len={len(description or '')}, "
+            f"count={count}, prefixes={prefixes or ''}, suffixes={suffixes or ''}"
+        )
+        payload = {
+            "core_kw": core_kw or industry or "",
+            "target_info": company_name or "",
+            "prefixes": prefixes or "",
+            "suffixes": suffixes or "",
+            "title_hint": ""
+        }
+        logger.info(f"蒸馏调用参数: {payload}")
+        result = await self.n8n.call("keyword-distill", payload)
 
         if result.get("status") == "error":
-            logger.error(f"关键词蒸馏失败: {result.get('message')}")
             return {"status": "error", "message": result.get("message"), "keywords": []}
 
-        keywords = result.get("keywords", [])
-        logger.info(f"关键词蒸馏完成，共{len(keywords)}个关键词")
-        return {"status": "success", "keywords": keywords}
+        extracted: List[str] = []
+        if isinstance(result.get("data"), list):
+            extracted = [str(x).strip() for x in result.get("data") if str(x).strip()]
+        elif isinstance(result.get("data"), dict):
+            core = result["data"].get("core_keywords") or []
+            long_tail = result["data"].get("long_tail_keywords") or []
+            combined = list(core) + list(long_tail)
+            extracted = [str(x).strip() for x in combined if str(x).strip()]
+        elif "keywords" in result:
+            raw = result.get("keywords") or []
+            extracted = [str(x).strip() for x in raw if str(x).strip()]
+
+        seen = set()
+        deduped = []
+        for k in extracted:
+            if k not in seen:
+                seen.add(k)
+                deduped.append(k)
+
+        if count and isinstance(count, int) and count > 0:
+            deduped = deduped[:count]
+
+        keywords_output = [{"keyword": k} for k in deduped]
+        return {"status": "success", "keywords": keywords_output}
 
     async def generate_questions(
         self,
