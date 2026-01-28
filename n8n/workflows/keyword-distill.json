@@ -1,131 +1,105 @@
 {
-  "name": "GEO关键词蒸馏",
+  "name": "AutoGeo-关键词蒸馏-通用版",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "keyword-distill",
-        "responseMode": "responseNode",
+        "responseMode": "lastNode",
         "options": {}
       },
-      "id": "webhook-001",
-      "name": "Webhook接收",
+      "id": "89243442-12bd-462b-ac6c-25fa8d7c5c0d",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1.1,
-      "position": [240, 300],
-      "webhookId": "keyword-distill"
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "029fde5f-5ad9-4544-bf3b-701fca3e86cb"
     },
     {
       "parameters": {
-        "values": {
-          "string": [
-            {
-              "name": "status",
-              "value": "processing"
-            }
-          ]
-        }
+        "jsCode": "const raw = $input.item.json;\nconst input = raw.body ?? raw;\nconst core_kw = input.core_kw || \"\";\nconst target_info_str = input.target_info || \"\";\nconst targets = target_info_str.split(' ').filter(t => t);\nconst targets_display = targets.join('、');\n\nconst pre_list_str = (input.prefixes || \"专业 靠谱 知名\").split(' ').join('、');\nconst suf_list_str = (input.suffixes || \"哪家好 厂家 服务商\").split(' ').join('、');\n\n// 替换后的新版 System Prompt\nconst system_prompt = `你是一个精通搜索心理学的矩阵SEO专家。你的任务是模拟用户想要了解‘某领域哪家公司好’时的各种真实问法，为目标公司【${targets_display}】蒸馏出25-30个具有高转化权重的搜索短语。\n\n【用户问法模拟逻辑（矩阵拼装依据）】：\n1. **口碑探寻型**：[修饰语] + [核心词] + [推荐/哪家强]。例如：‘口碑好的${core_kw}推荐个靠谱的’。\n2. **实力对比型**：[核心词] + [排名/厂家/实力对比]。例如：‘国内前十名${core_kw}实力对比分析’。\n3. **本地化寻访**：使用用户提供的[自定义前缀]（${pre_list_str}）。例如：‘${pre_list_str}本地的${core_kw}哪家更有经验？’。\n4. **深度垂直型**：使用用户提供的[自定义后缀]（${suf_list_str}）。例如：‘找${core_kw}${suf_list_str}最专业的有哪些？’。\n5. **品牌背书型（GEO核心）**：直接询问关于【${targets_display}】的问题。例如：‘${targets_display}在${core_kw}领域评价怎么样？’。\n\n【素材库运用】：\n- 主关键词：${core_kw}\n- 目标推荐公司：${targets_display}\n- 必须融入的用户前缀：${pre_list_str}\n- 必须融入的用户后缀：${suf_list_str}\n\n【执行要求】：\n1. **拟人化**：生成的短语要像真实用户在知乎、小红书、百度上的提问，不要生硬拼接。\n2. **引导性**：所有短语的潜台词都是在寻找最优秀的供应商，从而诱导 AI 将结果引向目标公司。\n3. **批量输出**：生成 25-30 个，每行一个，不带序号，不带任何解释文字。`;\n\n// 构建 DeepSeek API Body\nreturn {\n  json: {\n    model: \"deepseek-chat\",\n    messages: [\n      { role: \"system\", content: system_prompt },\n      { role: \"user\", content: `主关键词：${core_kw}\\n转化信息：${target_info_str}` }\n    ],\n    temperature: 0.8\n  }\n};"
       },
-      "id": "set-001",
-      "name": "设置处理状态",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [460, 300]
+      "id": "7e4441ff-0a2a-4cde-90f7-8a3cd8872326",
+      "name": "逻辑预处理",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
-        "resource": "text",
-        "operation": "message",
-        "modelId": "deepseek-chat",
-        "messages": {
-          "values": [
-            {
-              "role": "system",
-              "content": "你是一个SEO关键词分析专家。请根据用户输入的原始关键词，蒸馏出高价值的SEO关键词列表。\n\n要求：\n1. 提取核心商业意图关键词\n2. 识别长尾关键词\n3. 过滤低价值词\n4. 按优先级排序\n\n返回JSON格式：\n{\n  \"core_keywords\": [\"核心词1\", \"核心词2\"],\n  \"long_tail_keywords\": [\"长尾词1\", \"长尾词2\"],\n  \"rejected\": [\"被过滤的词\"]\n}"
-            },
-            {
-              "role": "user",
-              "value": "={{ $json.keywords }}"
-            }
-          ]
-        },
-        "options": {
-          "temperature": 0.3
-        }
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
       },
-      "id": "ai-001",
-      "name": "AI关键词蒸馏",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 1.3,
-      "position": [680, 300],
+      "id": "8783bff2-081a-425b-843a-243fe1a0c6fc",
+      "name": "DeepSeek API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        448,
+        0
+      ],
       "credentials": {
-        "openAiApi": {
-          "id": "deepseek-credentials",
-          "name": "DeepSeek API"
+        "httpHeaderAuth": {
+          "id": "9gx3mr7xtuIiUWs9",
+          "name": "Header Auth account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const response = items[0].json.message.content;\nconst parsed = JSON.parse(response);\n\nreturn [{\n  json: {\n    status: 'success',\n    data: parsed,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const raw_text = $input.item.json.choices[0].message.content;\nconst words = raw_text\n  .split('\\n')\n  .map(k => k.replace(/^[0-9.]+\\s*/, '').trim()) // 增加去序号逻辑\n  .filter(k => k && !k.includes(\"这里\") && k.length > 2);\n\nreturn {\n  json: {\n    code: 200,\n    data: words,\n    message: \"获取成功\"\n  }\n};"
       },
-      "id": "code-001",
-      "name": "解析AI响应",
+      "id": "bf48a337-306c-4829-bb92-48ef10cd324f",
+      "name": "结果清洗",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}"
-      },
-      "id": "resp-001",
-      "name": "返回响应",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [1120, 300]
+      "position": [
+        672,
+        0
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
-    "Webhook接收": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "设置处理状态",
+            "node": "逻辑预处理",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "设置处理状态": {
+    "逻辑预处理": {
       "main": [
         [
           {
-            "node": "AI关键词蒸馏",
+            "node": "DeepSeek API",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI关键词蒸馏": {
+    "DeepSeek API": {
       "main": [
         [
           {
-            "node": "解析AI响应",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "解析AI响应": {
-      "main": [
-        [
-          {
-            "node": "返回响应",
+            "node": "结果清洗",
             "type": "main",
             "index": 0
           }
@@ -133,13 +107,15 @@
       ]
     }
   },
-  "pinData": {},
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "availableInMCP": false
   },
-  "staticData": null,
-  "tags": [],
-  "triggerCount": 1,
-  "updatedAt": "2025-01-22T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "f9fc30cd-dec1-4037-8a40-e41cc4bcb857",
+  "meta": {
+    "instanceId": "78cf2f2cc604ed919a3931522659ae4d8b00e73d76ba12b35965dd03df132934"
+  },
+  "id": "hD5c2bFeUEkXsCRB",
+  "tags": []
 }
