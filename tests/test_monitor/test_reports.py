@@ -308,6 +308,15 @@ class TestReports:
 
     def test_empty_data_handling(self, clean_db):
         """测试空数据处理"""
+        # 清空文章数据（因为其他测试可能生成了数据，且 clean_db 是 function 级别的，
+        # 但有些数据可能是通过其他进程或手动插入的，这里确保清理干净）
+        from backend.database.models import GeoArticle, Article, PublishRecord, IndexCheckRecord
+        clean_db.query(PublishRecord).delete()
+        clean_db.query(IndexCheckRecord).delete()
+        clean_db.query(GeoArticle).delete()
+        clean_db.query(Article).delete()
+        clean_db.commit()
+
         # 在空数据库中测试
         response = requests.get(f"{BASE_URL}/api/reports/comprehensive")
         assert response.status_code == 200
@@ -337,10 +346,38 @@ class TestReports:
         # 期望非200响应
         assert response.status_code != 200
 
-    def test_top_projects_publish_field(self, clean_db):
-        """验证Top项目接口中 total_publish 字段目前硬编码为 0"""
-        response = requests.get(f"{BASE_URL}/api/reports/top-projects", params={"limit": 10})
+    def test_top_articles(self, clean_db):
+        """测试高贡献文章列表接口"""
+        response = requests.get(f"{BASE_URL}/api/reports/top-articles", params={
+            "limit": 10
+        })
         assert response.status_code == 200
+        
         data = response.json()
+        assert isinstance(data, list)
+        assert len(data) <= 10
+        
+        # 验证数据结构
         if len(data) > 0:
-            assert data[0]["total_publish"] == 0
+            article = data[0]
+            assert "article_id" in article
+            assert "title" in article
+            assert "platform" in article
+            assert "created_at" in article
+            assert "keyword_hit_rate" in article
+            assert "last_check_status" in article
+            
+            # 验证排序（按命中率降序）
+            if len(data) > 1:
+                assert data[0]["keyword_hit_rate"] >= data[1]["keyword_hit_rate"]
+
+    def test_top_articles_with_project_filter(self, clean_db, test_project):
+        """测试带项目筛选的高贡献文章列表"""
+        response = requests.get(f"{BASE_URL}/api/reports/top-articles", params={
+            "limit": 5,
+            "project_id": test_project.id
+        })
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)

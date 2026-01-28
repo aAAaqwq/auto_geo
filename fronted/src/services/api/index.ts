@@ -354,6 +354,10 @@ export const reportsApi = {
   // 获取TOP项目排行榜（新增）
   getTopProjects: (params?: { project_id?: number; limit?: number }) =>
     get<any>('/reports/top-projects', params),
+
+  // 获取TOP文章排行榜（新增）
+  getTopArticles: (params?: { project_id?: number; limit?: number }) =>
+    get<any>('/reports/top-articles', params),
 }
 
 // ==================== 预警通知 API ====================

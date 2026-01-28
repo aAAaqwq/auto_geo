@@ -666,3 +666,60 @@ async def get_top_projects(
     results.sort(key=lambda x: x["keyword_hit_rate"], reverse=True)
     
     return results[:limit]
+
+
+@router.get("/top-articles", response_model=List[dict])
+async def get_top_articles(
+    limit: int = Query(10, ge=1, le=50, description="返回数量"),
+    project_id: Optional[int] = Query(None, description="项目ID筛选"),
+    db: Session = Depends(get_db)
+):
+    """
+    获取高贡献文章列表
+    
+    注意：返回命中率最高的文章（通过关联的关键词检测结果）！
+    """
+    # 1. 获取基础查询
+    query = db.query(GeoArticle)
+    
+    if project_id:
+        keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
+        query = query.filter(GeoArticle.keyword_id.in_(keyword_ids))
+        
+    articles = query.all()
+    
+    results = []
+    
+    for article in articles:
+        # 查找该文章对应关键词的最近一次检测结果
+        last_check = db.query(IndexCheckRecord).filter(
+            IndexCheckRecord.keyword_id == article.keyword_id
+        ).order_by(IndexCheckRecord.check_time.desc()).first()
+        
+        # 统计历史命中率
+        total_checks = db.query(IndexCheckRecord).filter(
+            IndexCheckRecord.keyword_id == article.keyword_id
+        ).count()
+        
+        hit_count = db.query(IndexCheckRecord).filter(
+            IndexCheckRecord.keyword_id == article.keyword_id,
+            IndexCheckRecord.keyword_found == True
+        ).count()
+        
+        hit_rate = round(hit_count / total_checks * 100, 2) if total_checks > 0 else 0
+        
+        if hit_rate > 0:
+            results.append({
+                "article_id": article.id,
+                "title": article.title,
+                "platform": article.platform,
+                "created_at": article.created_at.isoformat(),
+                "keyword_hit_rate": hit_rate,
+                "last_check_status": last_check.keyword_found if last_check else False
+            })
+            
+    # 按命中率排序
+    results.sort(key=lambda x: x["keyword_hit_rate"], reverse=True)
+    
+    return results[:limit]
+

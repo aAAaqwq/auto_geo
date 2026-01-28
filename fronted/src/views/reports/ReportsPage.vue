@@ -145,7 +145,7 @@
       <!-- 项目TOP10排行榜 -->
       <div class="table-card">
         <div class="table-header">
-          <h3 class="table-title">项目TOP10排行榜</h3>
+          <h3 class="table-title">项目影响力排行榜</h3>
         </div>
         <el-table
           v-loading="loading"
@@ -154,23 +154,54 @@
           style="width: 100%"
         >
           <el-table-column type="index" label="排名" width="60" />
-          <el-table-column prop="project_name" label="项目名称" min-width="150" />
-          <el-table-column prop="company_name" label="公司名称" min-width="150" />
-          <el-table-column prop="total_articles" label="文章数" width="100" />
-          <el-table-column prop="total_publish" label="发布数" width="100" />
-          <el-table-column prop="total_checks" label="检测次数" width="100" />
-          <el-table-column prop="keyword_hit_rate" label="关键词命中率" width="120">
+          <el-table-column prop="project_name" label="品牌/项目" min-width="150" />
+          <el-table-column prop="company_name" label="公司" min-width="150" />
+          <el-table-column prop="total_articles" label="内容声量" width="100" />
+          <el-table-column prop="keyword_hit_rate" label="AI提及率" width="120">
             <template #default="{ row }">
               <span :class="getHitRateClass(row.keyword_hit_rate)">
                 {{ row.keyword_hit_rate }}%
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="company_hit_rate" label="公司名命中率" width="120">
+          <el-table-column prop="company_hit_rate" label="品牌关联度" width="120">
             <template #default="{ row }">
               <span :class="getHitRateClass(row.company_hit_rate)">
                 {{ row.company_hit_rate }}%
               </span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 高贡献文章榜 -->
+      <div class="table-card" style="margin-top: 20px;">
+        <div class="table-header">
+          <h3 class="table-title">高贡献内容分析 (AI引用源)</h3>
+        </div>
+        <el-table
+          v-loading="loadingArticles"
+          :data="topArticles"
+          stripe
+          style="width: 100%"
+        >
+          <el-table-column type="index" label="排名" width="60" />
+          <el-table-column prop="title" label="文章标题" min-width="250" show-overflow-tooltip />
+          <el-table-column prop="platform" label="发布平台" width="120">
+            <template #default="{ row }">
+              <el-tag size="small">{{ row.platform }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="keyword_hit_rate" label="AI引用贡献率" width="150">
+            <template #default="{ row }">
+              <span :class="getHitRateClass(row.keyword_hit_rate)">
+                {{ row.keyword_hit_rate }}%
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="发布时间" width="180">
+            <template #default="{ row }">
+              {{ new Date(row.created_at).toLocaleString() }}
             </template>
           </el-table-column>
         </el-table>
@@ -189,6 +220,7 @@ import { ElMessage } from 'element-plus'
 
 // 数据
 const loading = ref(false)
+const loadingArticles = ref(false)
 const selectedProjectId = ref<number | null>(null)
 const selectedDays = ref(7)
 const selectedPlatform = ref('all')
@@ -201,6 +233,7 @@ const dailyTrends = ref<any[]>([])
 const platformComparison = ref<any[]>([])
 const projectComparison = ref<any[]>([])
 const topProjects = ref<any[]>([])
+const topArticles = ref<any[]>([])
 
 // AI平台列表
 const aiPlatforms = [
@@ -289,6 +322,23 @@ const loadTopProjects = async () => {
   }
 }
 
+// 加载TOP文章
+const loadTopArticles = async () => {
+  loadingArticles.value = true
+  try {
+    const params: any = { limit: 10 }
+    if (selectedProjectId.value) {
+      params.project_id = selectedProjectId.value
+    }
+    const result = await reportsApi.getTopArticles(params)
+    topArticles.value = result || []
+  } catch (error) {
+    console.error('加载TOP文章失败:', error)
+  } finally {
+    loadingArticles.value = false
+  }
+}
+
 // 加载每日趋势数据
 const loadDailyTrends = async () => {
   try {
@@ -313,6 +363,7 @@ const loadData = async () => {
       loadPlatformComparison(),
       loadProjectComparison(),
       loadTopProjects(),
+      loadTopArticles(),
       loadDailyTrends()
     ])
   } finally {
