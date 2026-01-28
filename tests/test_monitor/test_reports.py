@@ -343,8 +343,8 @@ class TestReports:
             "days": 30,
             "project_ids": "invalid,ids"
         })
-        # 期望非200响应
-        assert response.status_code != 200
+        # 期望返回 422 错误
+        assert response.status_code == 422
 
     def test_top_articles(self, clean_db):
         """测试高贡献文章列表接口"""

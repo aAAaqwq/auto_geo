@@ -9,7 +9,7 @@
           clearable
           filterable
           style="width: 200px"
-          @change="loadData"
+          @change="handleProjectChange"
         >
           <el-option
             v-for="project in projects"
@@ -21,7 +21,7 @@
         <el-select
           v-model="selectedDays"
           style="width: 120px; margin-left: 12px"
-          @change="loadData"
+          @change="handleDaysChange"
         >
           <el-option label="近7天" :value="7" />
           <el-option label="近30天" :value="30" />
@@ -217,6 +217,14 @@ import * as echarts from 'echarts'
 import { reportsApi } from '@/services/api'
 import { geoKeywordApi } from '@/services/api'
 import { ElMessage } from 'element-plus'
+import type { 
+  ComprehensiveOverview, 
+  DailyTrendPoint, 
+  PlatformComparison, 
+  ProjectComparison, 
+  TopProject, 
+  TopArticle 
+} from '@/types'
 
 // 数据
 const loading = ref(false)
@@ -228,12 +236,12 @@ const selectedProjects = ref<number[]>([])
 const trendType = ref('all')
 
 const projects = ref<any[]>([])
-const overview = ref<any>({})
-const dailyTrends = ref<any[]>([])
-const platformComparison = ref<any[]>([])
-const projectComparison = ref<any[]>([])
-const topProjects = ref<any[]>([])
-const topArticles = ref<any[]>([])
+const overview = ref<Partial<ComprehensiveOverview>>({})
+const dailyTrends = ref<DailyTrendPoint[]>([])
+const platformComparison = ref<PlatformComparison[]>([])
+const projectComparison = ref<ProjectComparison[]>([])
+const topProjects = ref<TopProject[]>([])
+const topArticles = ref<TopArticle[]>([])
 
 // AI平台列表
 const aiPlatforms = [
@@ -256,7 +264,7 @@ const loadProjects = async () => {
     const result = await geoKeywordApi.getProjects()
     projects.value = result || []
     // 默认选择前5个项目
-    if (projects.value.length > 0) {
+    if (projects.value.length > 0 && selectedProjects.value.length === 0) {
       selectedProjects.value = projects.value.slice(0, 5).map((p: any) => p.id)
     }
   } catch (error) {
@@ -354,7 +362,7 @@ const loadDailyTrends = async () => {
   }
 }
 
-// 加载所有数据
+// 统一数据加载入口
 const loadData = async () => {
   loading.value = true
   try {
@@ -369,6 +377,20 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 筛选变化处理
+const handleProjectChange = () => {
+  loadData()
+}
+
+const handleDaysChange = () => {
+  // 只加载与时间相关的数据
+  Promise.all([
+    loadPlatformComparison(),
+    loadProjectComparison(),
+    loadDailyTrends()
+  ])
 }
 
 // 选择平台
@@ -411,11 +433,11 @@ const updatePlatformChart = () => {
     return `${date.getMonth() + 1}/${date.getDate()}`
   }) || []
   
-  const series = platformComparison.value.map((platform: any) => ({
+  const series = platformComparison.value.map((platform: PlatformComparison) => ({
     name: platform.platform_name,
     type: 'line',
     smooth: true,
-    data: platform.daily_data.map((item: any) => item.hit_rate),
+    data: platform.daily_data.map(item => item.hit_rate),
     itemStyle: {
       color: getPlatformColor(platform.platform)
     }
@@ -427,7 +449,7 @@ const updatePlatformChart = () => {
       axisPointer: { type: 'cross' }
     },
     legend: {
-      data: platformComparison.value.map((p: any) => p.platform_name),
+      data: platformComparison.value.map(p => p.platform_name),
       bottom: 0
     },
     grid: {
@@ -467,11 +489,11 @@ const updateProjectChart = () => {
   
   const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399']
   
-  const series = projectComparison.value.map((project: any, index: number) => ({
+  const series = projectComparison.value.map((project: ProjectComparison, index: number) => ({
     name: project.project_name,
     type: 'line',
     smooth: true,
-    data: project.daily_data.map((item: any) => item.hit_rate),
+    data: project.daily_data.map(item => item.hit_rate),
     itemStyle: {
       color: colors[index % colors.length]
     }
@@ -483,7 +505,7 @@ const updateProjectChart = () => {
       axisPointer: { type: 'cross' }
     },
     legend: {
-      data: projectComparison.value.map((p: any) => p.project_name),
+      data: projectComparison.value.map(p => p.project_name),
       bottom: 0
     },
     grid: {

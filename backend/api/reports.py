@@ -306,8 +306,12 @@ async def get_comprehensive_overview(
     total_articles_generated = total_articles + total_geo_articles
     
     # 质检通过/未通过的文章数
-    geo_articles_passed = geo_query.filter(GeoArticle.quality_status == "passed").count()
-    geo_articles_failed = geo_query.filter(GeoArticle.quality_status == "failed").count()
+    stats = geo_query.with_entities(
+        func.sum(case((GeoArticle.quality_status == "passed", 1), else_=0)).label("passed"),
+        func.sum(case((GeoArticle.quality_status == "failed", 1), else_=0)).label("failed")
+    ).first()
+    geo_articles_passed = stats.passed or 0
+    geo_articles_failed = stats.failed or 0
     
     # ========== 发布统计 ==========
     publish_query = db.query(PublishRecord)
@@ -320,9 +324,16 @@ async def get_comprehensive_overview(
         # 暂时不按项目筛选发布记录
     
     total_publish_records = publish_query.count()
-    publish_success = publish_query.filter(PublishRecord.publish_status == 2).count()  # 2=成功
-    publish_failed = publish_query.filter(PublishRecord.publish_status == 3).count()  # 3=失败
-    publish_pending = publish_query.filter(PublishRecord.publish_status == 0).count()  # 0=待发布
+    
+    publish_stats = publish_query.with_entities(
+        func.sum(case((PublishRecord.publish_status == 2, 1), else_=0)).label("success"),
+        func.sum(case((PublishRecord.publish_status == 3, 1), else_=0)).label("failed"),
+        func.sum(case((PublishRecord.publish_status == 0, 1), else_=0)).label("pending")
+    ).first()
+    
+    publish_success = publish_stats.success or 0
+    publish_failed = publish_stats.failed or 0
+    publish_pending = publish_stats.pending or 0
     
     publish_success_rate = round(publish_success / total_publish_records * 100, 2) if total_publish_records > 0 else 0
     
@@ -401,58 +412,75 @@ async def get_daily_trends(
         date_range.append(date)
     date_range.reverse()
     
-    results = []
+    # 1. 统计普通文章每日生成数
+    articles_daily = db.query(
+        func.date(Article.created_at).label("date"),
+        func.count().label("count")
+    ).filter(
+        Article.created_at >= start_date
+    ).group_by(
+        func.date(Article.created_at)
+    ).all()
+    articles_map = {str(r.date): r.count for r in articles_daily}
     
+    # 2. 统计GEO文章每日生成数
+    geo_query = db.query(
+        func.date(GeoArticle.created_at).label("date"),
+        func.count().label("count")
+    ).filter(
+        GeoArticle.created_at >= start_date
+    )
+    if project_id:
+        keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
+        geo_query = geo_query.filter(GeoArticle.keyword_id.in_(keyword_ids))
+    
+    geo_articles_daily = geo_query.group_by(func.date(GeoArticle.created_at)).all()
+    geo_articles_map = {str(r.date): r.count for r in geo_articles_daily}
+    
+    # 3. 统计每日发布数
+    publish_daily = db.query(
+        func.date(PublishRecord.published_at).label("date"),
+        func.count().label("total"),
+        func.sum(case((PublishRecord.publish_status == 2, 1), else_=0)).label("success")
+    ).filter(
+        PublishRecord.published_at >= start_date
+    ).group_by(
+        func.date(PublishRecord.published_at)
+    ).all()
+    publish_map = {str(r.date): (r.total, r.success or 0) for r in publish_daily}
+    
+    # 4. 统计每日检测数和命中数
+    check_query = db.query(
+        func.date(IndexCheckRecord.check_time).label("date"),
+        func.count().label("total"),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("hits")
+    ).filter(
+        IndexCheckRecord.check_time >= start_date
+    )
+    if project_id:
+        keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
+        check_query = check_query.filter(IndexCheckRecord.keyword_id.in_(keyword_ids))
+    
+    checks_daily = check_query.group_by(func.date(IndexCheckRecord.check_time)).all()
+    checks_map = {str(r.date): (r.total, r.hits or 0) for r in checks_daily}
+    
+    # 组合结果
+    results = []
     for date in date_range:
         date_str = date.isoformat()
-        date_start = datetime.combine(date, datetime.min.time())
-        date_end = datetime.combine(date, datetime.max.time())
         
-        # 统计当日生成的文章数（普通文章 + GEO文章）
-        articles_generated = db.query(Article).filter(
-            Article.created_at >= date_start,
-            Article.created_at < date_end
-        ).count()
-        
-        geo_articles_generated = db.query(GeoArticle)
-        if project_id:
-            keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
-            geo_articles_generated = geo_articles_generated.filter(GeoArticle.keyword_id.in_(keyword_ids))
-        
-        geo_articles_generated = geo_articles_generated.filter(
-            GeoArticle.created_at >= date_start,
-            GeoArticle.created_at < date_end
-        ).count()
-        
-        total_generated = articles_generated + geo_articles_generated
-        
-        # 统计当日发布的文章数
-        publish_query = db.query(PublishRecord).filter(
-            PublishRecord.published_at >= date_start,
-            PublishRecord.published_at < date_end
-        )
-        articles_published = publish_query.count()
-        publish_success = publish_query.filter(PublishRecord.publish_status == 2).count()
-        
-        # 统计当日检测次数和命中数
-        check_query = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.check_time >= date_start,
-            IndexCheckRecord.check_time < date_end
-        )
-        if project_id:
-            keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
-            check_query = check_query.filter(IndexCheckRecord.keyword_id.in_(keyword_ids))
-        
-        index_checks = check_query.count()
-        keyword_hits = check_query.filter(IndexCheckRecord.keyword_found == True).count()
+        art_count = articles_map.get(date_str, 0)
+        geo_art_count = geo_articles_map.get(date_str, 0)
+        pub_total, pub_success = publish_map.get(date_str, (0, 0))
+        check_total, check_hits = checks_map.get(date_str, (0, 0))
         
         results.append(DailyTrendPoint(
             date=date_str,
-            articles_generated=total_generated,
-            articles_published=articles_published,
-            publish_success=publish_success,
-            index_checks=index_checks,
-            keyword_hits=keyword_hits
+            articles_generated=art_count + geo_art_count,
+            articles_published=pub_total,
+            publish_success=pub_success,
+            index_checks=check_total,
+            keyword_hits=check_hits
         ))
     
     return results
@@ -485,8 +513,34 @@ async def get_platform_comparison(
         "deepseek": "DeepSeek"
     }
     
-    results = []
+    # 一次性获取所有平台的每日统计数据
+    check_query = db.query(
+        IndexCheckRecord.platform,
+        func.date(IndexCheckRecord.check_time).label("date"),
+        func.count().label("total"),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("hits")
+    ).filter(
+        IndexCheckRecord.check_time >= start_date,
+        IndexCheckRecord.platform.in_(platforms)
+    )
     
+    if project_id:
+        keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
+        check_query = check_query.filter(IndexCheckRecord.keyword_id.in_(keyword_ids))
+    
+    stats_results = check_query.group_by(
+        IndexCheckRecord.platform,
+        func.date(IndexCheckRecord.check_time)
+    ).all()
+    
+    # 构造数据映射：platform -> date -> {total, hits}
+    stats_map = {}
+    for r in stats_results:
+        if r.platform not in stats_map:
+            stats_map[r.platform] = {}
+        stats_map[r.platform][str(r.date)] = {"total": r.total, "hits": r.hits or 0}
+    
+    results = []
     for platform in platforms:
         platform_data = {
             "platform": platform,
@@ -494,27 +548,18 @@ async def get_platform_comparison(
             "daily_data": []
         }
         
+        platform_stats = stats_map.get(platform, {})
+        
         for date in date_range:
-            date_start = datetime.combine(date, datetime.min.time())
-            date_end = datetime.combine(date, datetime.max.time())
+            date_str = date.isoformat()
+            day_stats = platform_stats.get(date_str, {"total": 0, "hits": 0})
             
-            # 统计该平台当日的检测记录
-            check_query = db.query(IndexCheckRecord).filter(
-                IndexCheckRecord.platform == platform,
-                IndexCheckRecord.check_time >= date_start,
-                IndexCheckRecord.check_time < date_end
-            )
-            
-            if project_id:
-                keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
-                check_query = check_query.filter(IndexCheckRecord.keyword_id.in_(keyword_ids))
-            
-            total_checks = check_query.count()
-            keyword_hits = check_query.filter(IndexCheckRecord.keyword_found == True).count()
+            total_checks = day_stats["total"]
+            keyword_hits = day_stats["hits"]
             hit_rate = round(keyword_hits / total_checks * 100, 2) if total_checks > 0 else 0
             
             platform_data["daily_data"].append({
-                "date": date.isoformat(),
+                "date": date_str,
                 "total_checks": total_checks,
                 "keyword_hits": keyword_hits,
                 "hit_rate": hit_rate
@@ -556,8 +601,33 @@ async def get_project_comparison(
         date_range.append(date)
     date_range.reverse()
     
-    results = []
+    # 一次性获取所有项目的每日统计数据
+    project_ids_actual = [p.id for p in projects]
+    check_query = db.query(
+        Keyword.project_id,
+        func.date(IndexCheckRecord.check_time).label("date"),
+        func.count().label("total"),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("hits")
+    ).join(
+        Keyword, IndexCheckRecord.keyword_id == Keyword.id
+    ).filter(
+        IndexCheckRecord.check_time >= start_date,
+        Keyword.project_id.in_(project_ids_actual)
+    ).group_by(
+        Keyword.project_id,
+        func.date(IndexCheckRecord.check_time)
+    )
     
+    stats_results = check_query.all()
+    
+    # 构造映射：project_id -> date -> {total, hits}
+    stats_map = {}
+    for r in stats_results:
+        if r.project_id not in stats_map:
+            stats_map[r.project_id] = {}
+        stats_map[r.project_id][str(r.date)] = {"total": r.total, "hits": r.hits or 0}
+    
+    results = []
     for project in projects:
         project_data = {
             "project_id": project.id,
@@ -566,29 +636,18 @@ async def get_project_comparison(
             "daily_data": []
         }
         
-        # 获取项目的关键词ID
-        keyword_ids = db.query(Keyword.id).filter(
-            Keyword.project_id == project.id,
-            Keyword.status == "active"
-        ).subquery()
+        project_stats = stats_map.get(project.id, {})
         
         for date in date_range:
-            date_start = datetime.combine(date, datetime.min.time())
-            date_end = datetime.combine(date, datetime.max.time())
+            date_str = date.isoformat()
+            day_stats = project_stats.get(date_str, {"total": 0, "hits": 0})
             
-            # 统计该项目当日的检测记录
-            check_query = db.query(IndexCheckRecord).filter(
-                IndexCheckRecord.keyword_id.in_(keyword_ids),
-                IndexCheckRecord.check_time >= date_start,
-                IndexCheckRecord.check_time < date_end
-            )
-            
-            total_checks = check_query.count()
-            keyword_hits = check_query.filter(IndexCheckRecord.keyword_found == True).count()
+            total_checks = day_stats["total"]
+            keyword_hits = day_stats["hits"]
             hit_rate = round(keyword_hits / total_checks * 100, 2) if total_checks > 0 else 0
             
             project_data["daily_data"].append({
-                "date": date.isoformat(),
+                "date": date_str,
                 "total_checks": total_checks,
                 "keyword_hits": keyword_hits,
                 "hit_rate": hit_rate
@@ -614,52 +673,72 @@ async def get_top_projects(
     if project_id:
         project_query = project_query.filter(Project.id == project_id)
     
-    projects = project_query.all()
-    
+    # 使用 SQLAlchemy 的聚合查询优化
+    # 1. 关键词总数
+    kw_total_sub = db.query(
+        Keyword.project_id,
+        func.count(Keyword.id).label("total_keywords")
+    ).group_by(Keyword.project_id).subquery()
+
+    # 2. 检测统计
+    check_stats_sub = db.query(
+        Keyword.project_id,
+        func.count(IndexCheckRecord.id).label("total_checks"),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("keyword_found"),
+        func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label("company_found")
+    ).join(
+        IndexCheckRecord, Keyword.id == IndexCheckRecord.keyword_id
+    ).group_by(Keyword.project_id).subquery()
+
+    # 3. 文章统计
+    geo_article_sub = db.query(
+        Keyword.project_id,
+        func.count(GeoArticle.id).label("total_articles")
+    ).join(
+        GeoArticle, Keyword.id == GeoArticle.keyword_id
+    ).group_by(Keyword.project_id).subquery()
+
+    # 主查询
+    query = db.query(
+        Project.id.label("project_id"),
+        Project.name.label("project_name"),
+        Project.company_name,
+        func.coalesce(kw_total_sub.c.total_keywords, 0).label("total_keywords"),
+        func.coalesce(check_stats_sub.c.total_checks, 0).label("total_checks"),
+        func.coalesce(check_stats_sub.c.keyword_found, 0).label("keyword_found"),
+        func.coalesce(check_stats_sub.c.company_found, 0).label("company_found"),
+        func.coalesce(geo_article_sub.c.total_articles, 0).label("total_articles")
+    ).outerjoin(
+        kw_total_sub, Project.id == kw_total_sub.c.project_id
+    ).outerjoin(
+        check_stats_sub, Project.id == check_stats_sub.c.project_id
+    ).outerjoin(
+        geo_article_sub, Project.id == geo_article_sub.c.project_id
+    ).filter(Project.status == 1)
+
+    if project_id:
+        query = query.filter(Project.id == project_id)
+
+    stats_results = query.all()
+
     results = []
-    
-    for project in projects:
-        # 获取项目的关键词ID
-        keyword_ids = db.query(Keyword.id).filter(
-            Keyword.project_id == project.id,
-            Keyword.status == "active"
-        ).subquery()
-        
-        # 统计检测记录
-        total_checks = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id.in_(keyword_ids)
-        ).count()
-        
-        if total_checks == 0:
+    for r in stats_results:
+        if r.total_checks == 0:
             continue
-        
-        # 计算命中率
-        stats = db.query(
-            func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("keyword_found"),
-            func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label("company_found")
-        ).filter(
-            IndexCheckRecord.keyword_id.in_(keyword_ids)
-        ).first()
-        
-        keyword_found = stats.keyword_found or 0
-        company_found = stats.company_found or 0
-        
-        keyword_hit_rate = round(keyword_found / total_checks * 100, 2) if total_checks > 0 else 0
-        company_hit_rate = round(company_found / total_checks * 100, 2) if total_checks > 0 else 0
-        
-        # 统计文章和发布数据
-        geo_articles = db.query(GeoArticle).filter(GeoArticle.keyword_id.in_(keyword_ids)).count()
+            
+        keyword_hit_rate = round(r.keyword_found / r.total_checks * 100, 2)
+        company_hit_rate = round(r.company_found / r.total_checks * 100, 2)
         
         results.append({
-            "project_id": project.id,
-            "project_name": project.name,
-            "company_name": project.company_name,
-            "total_keywords": db.query(Keyword).filter(Keyword.project_id == project.id).count(),
-            "total_checks": total_checks,
+            "project_id": r.project_id,
+            "project_name": r.project_name,
+            "company_name": r.company_name,
+            "total_keywords": r.total_keywords,
+            "total_checks": r.total_checks,
             "keyword_hit_rate": keyword_hit_rate,
             "company_hit_rate": company_hit_rate,
-            "total_articles": geo_articles,
-            "total_publish": 0  # 暂时不统计
+            "total_articles": r.total_articles,
+            "total_publish": 0
         })
     
     # 按关键词命中率排序
@@ -679,43 +758,60 @@ async def get_top_articles(
     
     注意：返回命中率最高的文章（通过关联的关键词检测结果）！
     """
-    # 1. 获取基础查询
-    query = db.query(GeoArticle)
+    # 使用 SQLAlchemy 聚合查询优化
+    # 1. 统计每个关键词的命中率
+    kw_stats_sub = db.query(
+        IndexCheckRecord.keyword_id,
+        func.count(IndexCheckRecord.id).label("total_checks"),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("keyword_hits")
+    ).group_by(IndexCheckRecord.keyword_id).subquery()
+
+    # 2. 获取每个关键词的最新检测状态 (使用子查询获取最新ID)
+    latest_check_id_sub = db.query(
+        IndexCheckRecord.keyword_id,
+        func.max(IndexCheckRecord.id).label("max_id")
+    ).group_by(IndexCheckRecord.keyword_id).subquery()
+
+    latest_check_status_sub = db.query(
+        IndexCheckRecord.keyword_id,
+        IndexCheckRecord.keyword_found.label("last_status")
+    ).join(
+        latest_check_id_sub, IndexCheckRecord.id == latest_check_id_sub.c.max_id
+    ).subquery()
+
+    # 主查询
+    query = db.query(
+        GeoArticle.id.label("article_id"),
+        GeoArticle.title,
+        GeoArticle.platform,
+        GeoArticle.created_at,
+        func.coalesce(kw_stats_sub.c.total_checks, 0).label("total_checks"),
+        func.coalesce(kw_stats_sub.c.keyword_hits, 0).label("keyword_hits"),
+        func.coalesce(latest_check_status_sub.c.last_status, False).label("last_status")
+    ).outerjoin(
+        kw_stats_sub, GeoArticle.keyword_id == kw_stats_sub.c.keyword_id
+    ).outerjoin(
+        latest_check_status_sub, GeoArticle.keyword_id == latest_check_status_sub.c.keyword_id
+    )
     
     if project_id:
         keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
         query = query.filter(GeoArticle.keyword_id.in_(keyword_ids))
         
-    articles = query.all()
+    stats_results = query.all()
     
     results = []
-    
-    for article in articles:
-        # 查找该文章对应关键词的最近一次检测结果
-        last_check = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id == article.keyword_id
-        ).order_by(IndexCheckRecord.check_time.desc()).first()
-        
-        # 统计历史命中率
-        total_checks = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id == article.keyword_id
-        ).count()
-        
-        hit_count = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id == article.keyword_id,
-            IndexCheckRecord.keyword_found == True
-        ).count()
-        
-        hit_rate = round(hit_count / total_checks * 100, 2) if total_checks > 0 else 0
+    for r in stats_results:
+        hit_rate = round(r.keyword_hits / r.total_checks * 100, 2) if r.total_checks > 0 else 0
         
         if hit_rate > 0:
             results.append({
-                "article_id": article.id,
-                "title": article.title,
-                "platform": article.platform,
-                "created_at": article.created_at.isoformat(),
+                "article_id": r.article_id,
+                "title": r.title,
+                "platform": r.platform,
+                "created_at": r.created_at.isoformat(),
                 "keyword_hit_rate": hit_rate,
-                "last_check_status": last_check.keyword_found if last_check else False
+                "last_check_status": r.last_status
             })
             
     # 按命中率排序
