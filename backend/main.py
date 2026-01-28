@@ -23,8 +23,8 @@ from backend.config import (
     APP_NAME, APP_VERSION, DEBUG, HOST, PORT, RELOAD,
     CORS_ORIGINS, PLATFORMS
 )
-from backend.database import init_db, get_db, engine
-from backend.api import account, article, publish, keywords, geo, index_check, reports, notifications, scheduler, knowledge
+from backend.database import init_db, get_db
+from backend.api import account, article, publish, keywords, geo, index_check, reports, notifications, scheduler, knowledge, article_collection
 
 
 # ==================== WebSocket连接管理 ====================
@@ -119,6 +119,7 @@ app.include_router(reports.router)  # 加上数据报表路由！
 app.include_router(notifications.router)  # 加上预警通知路由！
 app.include_router(scheduler.router)  # 加上定时任务路由！
 app.include_router(knowledge.router)  # 加上知识库路由！
+app.include_router(article_collection.router)  # 加上爆火文章收集路由！
 
 
 # ==================== 基础接口 ====================
@@ -181,7 +182,6 @@ if __name__ == "__main__":
     import uvicorn
     import asyncio
     import sys
-    import signal
 
     # 修复：Windows 上 asyncio 子进程需要 ProactorEventLoop
     if sys.platform == "win32":
@@ -191,64 +191,10 @@ if __name__ == "__main__":
     logger.info(f"服务地址: http://{HOST}:{PORT}")
     logger.info(f"API文档: http://{HOST}:{PORT}/docs")
 
-    # 创建 uvicorn 配置
-    # 注意：reload 模式下优雅关闭可能不完全，生产环境建议设为 False
-    config = uvicorn.Config(
-        app=app,
+    uvicorn.run(
+        "main:app",
         host=HOST,
         port=PORT,
         reload=RELOAD,
-        log_level="info",
-        # 优雅关闭超时时间（秒）
-        timeout_graceful_shutdown=5
+        log_level="info"
     )
-    server = uvicorn.Server(config)
-
-    # 优雅关闭处理
-    def signal_handler(sig: int, frame):
-        """处理关闭信号"""
-        logger.info(f"收到关闭信号, 正在优雅关闭服务...")
-        # 设置退出标志
-        if hasattr(server, 'should_exit'):
-            server.should_exit = True
-        # 同时也调用 shutdown
-        if hasattr(server, 'shutdown'):
-            asyncio.create_task(server.shutdown())
-
-    # 注册信号处理器
-    # Windows: 只支持 SIGINT (Ctrl+C)
-    # Unix: 支持 SIGINT, SIGTERM
-    if sys.platform == "win32":
-        signal.signal(signal.SIGINT, signal_handler)
-    else:
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-    # 运行服务器
-    try:
-        server.run()
-    except KeyboardInterrupt:
-        logger.info("收到 Ctrl+C, 正在关闭...")
-    finally:
-        logger.info("正在清理资源...")
-        # 关闭所有 WebSocket 连接
-        for client_id in list(ws_manager.active_connections.keys()):
-            logger.debug(f"关闭 WebSocket 连接: {client_id}")
-        ws_manager.active_connections.clear()
-
-        # 关闭 Playwright 浏览器
-        try:
-            from backend.services.playwright_mgr import playwright_mgr
-            asyncio.run(playwright_mgr.stop())
-            logger.info("Playwright 浏览器已关闭")
-        except Exception as e:
-            logger.debug(f"关闭 Playwright 时出错: {e}")
-
-        # 关闭数据库连接
-        try:
-            engine.dispose()
-            logger.info("数据库连接已关闭")
-        except Exception as e:
-            logger.debug(f"关闭数据库连接时出错: {e}")
-
-        logger.info(f"{APP_NAME} 已安全关闭")
