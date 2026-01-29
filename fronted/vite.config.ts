@@ -25,9 +25,9 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1', // 修复：强制 IPv4，Electron 才能连上
-    port: 5173,
-    strictPort: true, // 修复：端口被占用时报错而不是跳到下一个
+    host: '127.0.0.1',
+    port: 3000,
+    strictPort: false,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8001',

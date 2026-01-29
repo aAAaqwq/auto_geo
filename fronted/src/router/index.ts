@@ -105,6 +105,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/scheduler/SchedulerPage.vue'),
         meta: { title: '定时任务', icon: 'Timer' },
       },
+      // ==================== 数据报表路由 ====================
+      {
+        path: 'reports',
+        name: 'Reports',
+        component: () => import('@/views/reports/ReportsPage.vue'),
+        meta: { title: '数据报表', icon: 'DataAnalysis' },
+      },
     ],
   },
 ]
