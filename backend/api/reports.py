@@ -104,47 +104,51 @@ async def get_project_stats(db: Session = Depends(get_db)):
 
     注意：返回每个项目的关键词数量、命中率等！
     """
+    # 1. 批量查询关键词统计
+    keyword_stats = db.query(
+        Keyword.project_id,
+        func.count(Keyword.id).label('total'),
+        func.sum(case((Keyword.status == 'active', 1), else_=0)).label('active')
+    ).group_by(Keyword.project_id).all()
+    keyword_map = {r.project_id: (r.total, r.active or 0) for r in keyword_stats}
+
+    # 2. 批量查询问题变体统计
+    question_stats = db.query(
+        Keyword.project_id,
+        func.count(QuestionVariant.id).label('total')
+    ).select_from(Keyword).join(
+        QuestionVariant, QuestionVariant.keyword_id == Keyword.id
+    ).group_by(
+        Keyword.project_id
+    ).all()
+    question_map = {r.project_id: r.total for r in question_stats}
+
+    # 3. 批量查询检测记录统计 (只统计 active 关键词)
+    check_stats = db.query(
+        Keyword.project_id,
+        func.count(IndexCheckRecord.id).label('total'),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label('keyword_found'),
+        func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label('company_found')
+    ).select_from(Keyword).join(
+        IndexCheckRecord, IndexCheckRecord.keyword_id == Keyword.id
+    ).filter(
+        Keyword.status == "active"
+    ).group_by(
+        Keyword.project_id
+    ).all()
+    check_map = {
+        r.project_id: (r.total, r.keyword_found or 0, r.company_found or 0) 
+        for r in check_stats
+    }
+
+    # 4. 组装结果
     projects = db.query(Project).filter(Project.status == 1).all()
-
     results = []
+    
     for project in projects:
-        # 统计关键词数量
-        total_keywords = db.query(Keyword).filter(
-            Keyword.project_id == project.id
-        ).count()
-        active_keywords = db.query(Keyword).filter(
-            Keyword.project_id == project.id,
-            Keyword.status == "active"
-        ).count()
-
-        # 统计问题变体数量
-        keyword_ids = db.query(Keyword.id).filter(
-            Keyword.project_id == project.id
-        ).subquery()
-        total_questions = db.query(QuestionVariant).filter(
-            QuestionVariant.keyword_id.in_(keyword_ids)
-        ).count()
-
-        # 统计检测记录
-        keyword_ids_active = db.query(Keyword.id).filter(
-            Keyword.project_id == project.id,
-            Keyword.status == "active"
-        ).subquery()
-
-        total_checks = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id.in_(keyword_ids_active)
-        ).count()
-
-        # 计算命中率
-        stats = db.query(
-            func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("keyword_found"),
-            func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label("company_found")
-        ).filter(
-            IndexCheckRecord.keyword_id.in_(keyword_ids_active)
-        ).first()
-
-        keyword_found = stats.keyword_found or 0
-        company_found = stats.company_found or 0
+        total_keywords, active_keywords = keyword_map.get(project.id, (0, 0))
+        total_questions = question_map.get(project.id, 0)
+        total_checks, keyword_found, company_found = check_map.get(project.id, (0, 0, 0))
 
         keyword_hit_rate = round(keyword_found / total_checks * 100, 2) if total_checks > 0 else 0
         company_hit_rate = round(company_found / total_checks * 100, 2) if total_checks > 0 else 0
@@ -173,16 +177,26 @@ async def get_platform_stats(db: Session = Depends(get_db)):
     """
     platforms = ["doubao", "qianwen", "deepseek"]
 
+    # 优化：使用聚合查询直接在数据库层计算
+    stats = db.query(
+        IndexCheckRecord.platform,
+        func.count(IndexCheckRecord.id).label('total'),
+        func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label('keyword_found'),
+        func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label('company_found')
+    ).filter(
+        IndexCheckRecord.platform.in_(platforms)
+    ).group_by(
+        IndexCheckRecord.platform
+    ).all()
+    
+    stats_map = {
+        r.platform: (r.total, r.keyword_found or 0, r.company_found or 0) 
+        for r in stats
+    }
+
     results = []
     for platform in platforms:
-        # 统计该平台的检测记录
-        records = db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.platform == platform
-        ).all()
-
-        total_checks = len(records)
-        keyword_found = sum(1 for r in records if r.keyword_found)
-        company_found = sum(1 for r in records if r.company_found)
+        total_checks, keyword_found, company_found = stats_map.get(platform, (0, 0, 0))
 
         keyword_hit_rate = round(keyword_found / total_checks * 100, 2) if total_checks > 0 else 0
         company_hit_rate = round(company_found / total_checks * 100, 2) if total_checks > 0 else 0
@@ -302,14 +316,15 @@ async def get_comprehensive_overview(
         keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
         geo_query = geo_query.filter(GeoArticle.keyword_id.in_(keyword_ids))
     
-    total_geo_articles = geo_query.count()
-    total_articles_generated = total_articles + total_geo_articles
-    
-    # 质检通过/未通过的文章数
+    # 优化：合并查询
     stats = geo_query.with_entities(
+        func.count(GeoArticle.id).label("total"),
         func.sum(case((GeoArticle.quality_status == "passed", 1), else_=0)).label("passed"),
         func.sum(case((GeoArticle.quality_status == "failed", 1), else_=0)).label("failed")
     ).first()
+
+    total_geo_articles = stats.total or 0
+    total_articles_generated = total_articles + total_geo_articles
     geo_articles_passed = stats.passed or 0
     geo_articles_failed = stats.failed or 0
     
@@ -323,14 +338,15 @@ async def get_comprehensive_overview(
         # 注意：PublishRecord关联的是Article，不是GeoArticle，这里需要特殊处理
         # 暂时不按项目筛选发布记录
     
-    total_publish_records = publish_query.count()
-    
+    # 优化：合并查询
     publish_stats = publish_query.with_entities(
+        func.count(PublishRecord.id).label("total"),
         func.sum(case((PublishRecord.publish_status == 2, 1), else_=0)).label("success"),
         func.sum(case((PublishRecord.publish_status == 3, 1), else_=0)).label("failed"),
         func.sum(case((PublishRecord.publish_status == 0, 1), else_=0)).label("pending")
     ).first()
     
+    total_publish_records = publish_stats.total or 0
     publish_success = publish_stats.success or 0
     publish_failed = publish_stats.failed or 0
     publish_pending = publish_stats.pending or 0
@@ -343,13 +359,14 @@ async def get_comprehensive_overview(
         keyword_ids = db.query(Keyword.id).filter(Keyword.project_id == project_id).subquery()
         check_query = check_query.filter(IndexCheckRecord.keyword_id.in_(keyword_ids))
     
-    total_checks = check_query.count()
-    
+    # 优化：合并查询
     check_stats = check_query.with_entities(
+        func.count(IndexCheckRecord.id).label("total"),
         func.sum(case((IndexCheckRecord.keyword_found == True, 1), else_=0)).label("keyword_found"),
         func.sum(case((IndexCheckRecord.company_found == True, 1), else_=0)).label("company_found")
     ).first()
     
+    total_checks = check_stats.total or 0
     keyword_found = check_stats.keyword_found or 0
     company_found = check_stats.company_found or 0
     
