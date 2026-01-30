@@ -127,14 +127,6 @@ PLATFORMS = {
         "publish_url": "https://pdcreator.pdnews.cn/producer",
         "color": "#C62828",
     },
-    "sohu": {
-        "id": "sohu",
-        "name": "搜狐号",
-        "code": "SH",
-        "login_url": "https://mp.sohu.com/",
-        "publish_url": "https://mp.sohu.com/main/home/index.action",
-        "color": "#FFD600",
-    },
 }
 
 # ==================== 日志配置 ====================
