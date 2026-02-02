@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from loguru import logger
 
 from backend.database import get_db
-from backend.database.models import PublishRecord, Account, Article
+from backend.database.models import PublishRecord, Account, Article, User
 from backend.schemas import (
     ApiResponse,
     PublishTaskCreate,
@@ -22,6 +22,7 @@ from backend.schemas import (
     PublishStatus,
 )
 from backend.config import PLATFORMS
+from backend.services.auth import get_current_user, is_admin
 
 
 router = APIRouter(prefix="/api/publish", tags=["发布管理"])
@@ -135,6 +136,7 @@ async def get_supported_platforms():
 async def create_publish_task(
     request: PublishTaskCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建发布任务
@@ -142,13 +144,19 @@ async def create_publish_task(
     用这个接口来启动批量发布！
     """
     # 1. 验证文章和账号是否存在
-    articles = db.query(Article).filter(Article.id.in_(request.article_ids)).all()
+    articles_query = db.query(Article).filter(Article.id.in_(request.article_ids))
+    if not is_admin(current_user):
+        articles_query = articles_query.filter(Article.owner_id == current_user.id)
+    articles = articles_query.all()
     if len(articles) != len(request.article_ids):
         found_ids = [a.id for a in articles]
         missing = set(request.article_ids) - set(found_ids)
         raise HTTPException(status_code=404, detail=f"文章不存在: {missing}")
 
-    accounts = db.query(Account).filter(Account.id.in_(request.account_ids)).all()
+    accounts_query = db.query(Account).filter(Account.id.in_(request.account_ids))
+    if not is_admin(current_user):
+        accounts_query = accounts_query.filter(Account.owner_id == current_user.id)
+    accounts = accounts_query.all()
     if len(accounts) != len(request.account_ids):
         found_ids = [a.id for a in accounts]
         missing = set(request.account_ids) - set(found_ids)
@@ -176,6 +184,7 @@ async def create_publish_task(
 
             if not existing:
                 record = PublishRecord(
+                    owner_id=current_user.id,
                     article_id=article_id,
                     account_id=account_id,
                     publish_status=0,  # 待发布
@@ -310,7 +319,7 @@ async def execute_publish_task(task_id: str, articles: List[Article],
 
 
 @router.get("/progress/{task_id}", response_model=ApiResponse)
-async def get_publish_progress(task_id: str, db: Session = Depends(get_db)):
+async def get_publish_progress(task_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取发布进度
 
@@ -334,8 +343,13 @@ async def get_publish_progress(task_id: str, db: Session = Depends(get_db)):
     # 获取详细信息
     items = []
     for sub_task in task_info["sub_tasks"]:
-        article = db.query(Article).filter(Article.id == sub_task["article_id"]).first()
-        account = db.query(Account).filter(Account.id == sub_task["account_id"]).first()
+        article_query = db.query(Article).filter(Article.id == sub_task["article_id"])
+        account_query = db.query(Account).filter(Account.id == sub_task["account_id"])
+        if not is_admin(current_user):
+            article_query = article_query.filter(Article.owner_id == current_user.id)
+            account_query = account_query.filter(Account.owner_id == current_user.id)
+        article = article_query.first()
+        account = account_query.first()
 
         if not article or not account:
             continue
@@ -371,6 +385,7 @@ async def get_publish_records(
     account_id: Optional[int] = Query(None, description="账号ID"),
     limit: int = Query(50, ge=1, le=200, description="返回数量"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取发布记录
@@ -379,6 +394,8 @@ async def get_publish_records(
     """
     query = db.query(PublishRecord)
 
+    if not is_admin(current_user):
+        query = query.filter(PublishRecord.owner_id == current_user.id)
     if article_id is not None:
         query = query.filter(PublishRecord.article_id == article_id)
     if account_id is not None:
@@ -420,6 +437,7 @@ async def get_publish_records(
 async def retry_publish(
     record_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     重试发布
@@ -427,7 +445,10 @@ async def retry_publish(
     用这个接口来重新发布失败的任务！
     """
     # 1. 查找发布记录
-    record = db.query(PublishRecord).filter(PublishRecord.id == record_id).first()
+    query = db.query(PublishRecord).filter(PublishRecord.id == record_id)
+    if not is_admin(current_user):
+        query = query.filter(PublishRecord.owner_id == current_user.id)
+    record = query.first()
     if not record:
         raise HTTPException(status_code=404, detail="发布记录不存在")
 

@@ -14,10 +14,11 @@ from sqlalchemy import func, case
 from backend.database import get_db
 from backend.database.models import Project, Keyword, IndexCheckRecord, QuestionVariant
 from backend.schemas import ApiResponse
+from backend.services.auth import require_role
 from loguru import logger
 
 
-router = APIRouter(prefix="/api/reports", tags=["数据报表"])
+router = APIRouter(prefix="/api/reports", tags=["数据报表"], dependencies=[Depends(require_role("admin"))])
 
 
 # ==================== 响应模型 ====================

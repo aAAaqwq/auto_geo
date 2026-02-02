@@ -97,7 +97,8 @@ class KeywordService:
         name: str,
         company_name: str,
         description: Optional[str] = None,
-        industry: Optional[str] = None
+        industry: Optional[str] = None,
+        owner_id: Optional[int] = None,
     ) -> Project:
         """
         创建项目
@@ -115,7 +116,8 @@ class KeywordService:
             name=name,
             company_name=company_name,
             description=description,
-            industry=industry
+            industry=industry,
+            owner_id=owner_id,
         )
         self.db.add(project)
         self.db.commit()
@@ -127,7 +129,8 @@ class KeywordService:
         self,
         project_id: int,
         keyword: str,
-        difficulty_score: Optional[int] = None
+        difficulty_score: Optional[int] = None,
+        owner_id: Optional[int] = None,
     ) -> Keyword:
         """
         添加关键词
@@ -143,7 +146,8 @@ class KeywordService:
         kw = Keyword(
             project_id=project_id,
             keyword=keyword,
-            difficulty_score=difficulty_score
+            difficulty_score=difficulty_score,
+            owner_id=owner_id,
         )
         self.db.add(kw)
         self.db.commit()
@@ -154,7 +158,8 @@ class KeywordService:
     def add_question_variant(
         self,
         keyword_id: int,
-        question: str
+        question: str,
+        owner_id: Optional[int] = None,
     ) -> QuestionVariant:
         """
         添加问题变体
@@ -168,7 +173,8 @@ class KeywordService:
         """
         qv = QuestionVariant(
             keyword_id=keyword_id,
-            question=question
+            question=question,
+            owner_id=owner_id,
         )
         self.db.add(qv)
         self.db.commit()

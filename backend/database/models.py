@@ -12,6 +12,65 @@ from backend.database import Base
 TABLE_ARGS = {"extend_existing": True}
 
 
+class User(Base):
+    """
+    用户表
+    管理系统登录用户与角色
+    """
+    __tablename__ = "users"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    username = Column(String(100), unique=True, nullable=False, index=True, comment="用户名")
+    email = Column(String(200), unique=True, nullable=True, index=True, comment="邮箱")
+    password_hash = Column(String(200), nullable=False, comment="密码哈希")
+    role = Column(String(20), default="user", comment="角色：admin/user")
+    status = Column(String(20), default="active", comment="状态：active/disabled")
+    last_login_at = Column(DateTime, nullable=True, comment="最后登录时间")
+
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+
+    def __repr__(self):
+        return f"<User {self.username} role={self.role}>"
+
+
+class RefreshToken(Base):
+    """
+    刷新令牌表
+    用于会话管理与强制登出
+    """
+    __tablename__ = "refresh_tokens"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True, comment="用户ID")
+    token_hash = Column(String(200), nullable=False, index=True, comment="刷新令牌哈希")
+    expires_at = Column(DateTime, nullable=False, comment="过期时间")
+    revoked_at = Column(DateTime, nullable=True, comment="撤销时间")
+    ip = Column(String(100), nullable=True, comment="IP地址")
+    user_agent = Column(String(500), nullable=True, comment="User-Agent")
+
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+
+
+class AuditLog(Base):
+    """
+    审计日志表
+    记录关键操作
+    """
+    __tablename__ = "audit_logs"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="用户ID")
+    action = Column(String(100), nullable=False, comment="操作类型")
+    target_type = Column(String(100), nullable=True, comment="目标类型")
+    target_id = Column(String(100), nullable=True, comment="目标ID")
+    meta = Column(Text, nullable=True, comment="扩展信息")
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+
+
 class Account(Base):
     """
     账号表
@@ -21,6 +80,7 @@ class Account(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     platform = Column(String(50), nullable=False, index=True, comment="平台ID：zhihu/baijiahao/sohu/toutiao")
     account_name = Column(String(100), nullable=False, comment="账号备注名称")
     username = Column(String(100), nullable=True, comment="登录账号/用户名")
@@ -54,6 +114,7 @@ class Article(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     title = Column(String(200), nullable=False, comment="文章标题")
     content = Column(Text, nullable=False, comment="文章正文内容（Markdown/HTML）")
 
@@ -88,6 +149,7 @@ class PublishRecord(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
 
     # 外键
     article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, index=True, comment="文章ID")
@@ -126,6 +188,7 @@ class Project(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     name = Column(String(200), nullable=False, comment="项目名称")
     company_name = Column(String(200), nullable=False, comment="公司名称")
     domain_keyword = Column(String(200), nullable=True, comment="领域关键词，用于关键词蒸馏")
@@ -152,6 +215,7 @@ class Keyword(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True, comment="项目ID")
     keyword = Column(String(200), nullable=False, comment="关键词")
     difficulty_score = Column(Integer, nullable=True, comment="难度评分（0-100）")
@@ -175,6 +239,7 @@ class QuestionVariant(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
     question = Column(Text, nullable=False, comment="问题变体")
 
@@ -194,6 +259,7 @@ class IndexCheckRecord(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
     platform = Column(String(50), nullable=False, comment="检测平台：doubao/qianwen/deepseek")
     question = Column(Text, nullable=False, comment="检测时使用的问题")
@@ -219,6 +285,7 @@ class GeoArticle(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
     title = Column(Text, nullable=True, comment="文章标题")
     content = Column(Text, nullable=False, comment="文章正文内容")
@@ -252,6 +319,7 @@ class KnowledgeCategory(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     name = Column(String(200), nullable=False, comment="企业/分类名称")
     industry = Column(String(100), nullable=True, comment="所属行业")
     description = Column(Text, nullable=True, comment="分类描述")
@@ -278,6 +346,7 @@ class Knowledge(Base):
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="所属用户ID")
     category_id = Column(Integer, ForeignKey("knowledge_categories.id", ondelete="CASCADE"), nullable=False, index=True, comment="分类ID")
     title = Column(String(200), nullable=False, comment="知识标题")
     content = Column(Text, nullable=False, comment="知识内容")

@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.services.scheduler_service import get_scheduler_service
 from backend.schemas import ApiResponse
+from backend.services.auth import require_role
 from loguru import logger
 
 
-router = APIRouter(prefix="/api/scheduler", tags=["定时任务"])
+router = APIRouter(prefix="/api/scheduler", tags=["定时任务"], dependencies=[Depends(require_role("admin"))])
 
 
 # ==================== 响应模型 ====================

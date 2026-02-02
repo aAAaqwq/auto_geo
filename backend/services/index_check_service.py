@@ -103,6 +103,7 @@ class IndexCheckService:
 
                         # 保存检测结果
                         record = IndexCheckRecord(
+                            owner_id=keyword_obj.owner_id,
                             keyword_id=keyword_id,
                             platform=platform_id,
                             question=qv.question,

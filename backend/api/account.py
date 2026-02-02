@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.database.models import Account
+from backend.database.models import Account, User
 from backend.schemas import (
     AccountCreate, AccountUpdate, AccountResponse, AccountDetailResponse,
     AuthStartRequest, AuthStartResponse, AuthStatusResponse,
@@ -18,6 +18,7 @@ from backend.schemas import (
 from backend.config import PLATFORMS
 from backend.services.playwright_mgr import playwright_mgr
 from backend.services.crypto import encrypt_cookies, encrypt_storage_state
+from backend.services.auth import get_current_user, is_admin, get_owned_resource
 from loguru import logger
 
 
@@ -48,7 +49,8 @@ playwright_mgr.set_ws_callback(ws_notification)
 async def get_accounts(
     platform: str = Query(None, description="平台筛选"),
     status: int = Query(None, description="状态筛选"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取账号列表
@@ -57,6 +59,8 @@ async def get_accounts(
     """
     query = db.query(Account)
 
+    if not is_admin(current_user):
+        query = query.filter(Account.owner_id == current_user.id)
     if platform:
         query = query.filter(Account.platform == platform)
     if status is not None:
@@ -67,11 +71,9 @@ async def get_accounts(
 
 
 @router.get("/{account_id}", response_model=AccountDetailResponse)
-async def get_account(account_id: int, db: Session = Depends(get_db)):
+async def get_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取账号详情"""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     # 构建响应
     response = AccountDetailResponse(
@@ -92,7 +94,7 @@ async def get_account(account_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=AccountResponse, status_code=201)
-async def create_account(account_data: AccountCreate, db: Session = Depends(get_db)):
+async def create_account(account_data: AccountCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     创建账号
 
@@ -104,6 +106,7 @@ async def create_account(account_data: AccountCreate, db: Session = Depends(get_
 
     # 创建账号记录
     account = Account(
+        owner_id=current_user.id,
         platform=account_data.platform,
         account_name=account_data.account_name,
         remark=account_data.remark,
@@ -121,12 +124,11 @@ async def create_account(account_data: AccountCreate, db: Session = Depends(get_
 async def update_account(
     account_id: int,
     account_data: AccountUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新账号信息"""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     # 更新字段
     if account_data.account_name is not None:
@@ -144,15 +146,13 @@ async def update_account(
 
 
 @router.delete("/{account_id}", response_model=ApiResponse)
-async def delete_account(account_id: int, db: Session = Depends(get_db)):
+async def delete_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     删除账号
 
     注意：删除会级联删除相关的发布记录！
     """
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    account = get_owned_resource(Account, account_id, db, current_user, "账号")
 
     db.delete(account)
     db.commit()
@@ -164,7 +164,7 @@ async def delete_account(account_id: int, db: Session = Depends(get_db)):
 # ==================== 授权相关 ====================
 
 @router.post("/auth/start", response_model=AuthStartResponse)
-async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db)):
+async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     开始账号授权
 
@@ -183,13 +183,16 @@ async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db))
             raise HTTPException(status_code=404, detail="账号不存在")
         if account.platform != platform:
             raise HTTPException(status_code=400, detail="平台不匹配")
+        if not is_admin(current_user) and account.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="权限不足")
 
     # 创建授权任务
     try:
         task = await playwright_mgr.create_auth_task(
             platform,
             auth_data.account_id,
-            auth_data.account_name
+            auth_data.account_name,
+            owner_id=current_user.id,
         )
         logger.info(f"授权任务已启动: {task.task_id}, 平台: {platform}")
         return AuthStartResponse(
@@ -204,7 +207,7 @@ async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db))
 
 
 @router.get("/auth/status/{task_id}", response_model=AuthStatusResponse)
-async def get_auth_status(task_id: str, db: Session = Depends(get_db)):
+async def get_auth_status(task_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取授权状态
 
@@ -216,6 +219,10 @@ async def get_auth_status(task_id: str, db: Session = Depends(get_db)):
 
     # 返回账号ID（新账号创建后或老账号更新后）
     account_id = task.account_id or task.created_account_id
+    if account_id and not is_admin(current_user):
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if not account or account.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="权限不足")
 
     response = AuthStatusResponse(
         task_id=task.task_id,
@@ -234,7 +241,7 @@ async def get_auth_status(task_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/auth/save/{task_id}", response_model=ApiResponse)
-async def save_auth(task_id: str, account_id: int, db: Session = Depends(get_db)):
+async def save_auth(task_id: str, account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     手动保存授权结果（用于新账号）
 
@@ -250,6 +257,8 @@ async def save_auth(task_id: str, account_id: int, db: Session = Depends(get_db)
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="账号不存在")
+    if not is_admin(current_user) and account.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="权限不足")
 
     # 保存授权信息
     account.cookies = encrypt_cookies(task.cookies)
@@ -266,7 +275,7 @@ async def save_auth(task_id: str, account_id: int, db: Session = Depends(get_db)
 
 
 @router.post("/auth/confirm/{task_id}", response_model=ApiResponse)
-async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
+async def confirm_auth(task_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     用户手动确认授权完成
 
@@ -310,6 +319,8 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
             # 更新现有账号
             account = db.query(Account).filter(Account.id == task.account_id).first()
             if account:
+                if not is_admin(current_user) and account.owner_id != current_user.id:
+                    raise HTTPException(status_code=403, detail="权限不足")
                 account.cookies = encrypt_cookies(cookies)
                 account.storage_state = encrypt_storage_state(storage_state)
                 account.status = 1
@@ -321,6 +332,7 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
             # 创建新账号
             account_name = task.account_name or f"{PLATFORMS[task.platform]['name']}账号"
             account = Account(
+                owner_id=current_user.id,
                 platform=task.platform,
                 account_name=account_name,
                 cookies=encrypt_cookies(cookies),

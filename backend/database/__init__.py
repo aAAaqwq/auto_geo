@@ -47,9 +47,11 @@ def init_db():
     注意：第一次运行时调用！
     """
     from .models import (
+        User, RefreshToken, AuditLog,
         Account, Article, PublishRecord,
         Project, Keyword, QuestionVariant,
-        IndexCheckRecord, GeoArticle
+        IndexCheckRecord, GeoArticle,
+        KnowledgeCategory, Knowledge
     )  # noqa: F401
     from loguru import logger
     from sqlalchemy import inspect

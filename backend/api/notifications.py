@@ -16,10 +16,11 @@ from backend.services.notification_service import (
     LogNotificationChannel
 )
 from backend.schemas import ApiResponse
+from backend.services.auth import require_role
 from loguru import logger
 
 
-router = APIRouter(prefix="/api/notifications", tags=["预警通知"])
+router = APIRouter(prefix="/api/notifications", tags=["预警通知"], dependencies=[Depends(require_role("admin"))])
 
 
 # ==================== 请求/响应模型 ====================

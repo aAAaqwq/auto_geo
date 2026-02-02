@@ -11,10 +11,11 @@ from pydantic import BaseModel, field_serializer
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.database.models import Project, Keyword, QuestionVariant
+from backend.database.models import Project, Keyword, QuestionVariant, User
 from backend.services.keyword_service import KeywordService
 from backend.schemas import ApiResponse
 from loguru import logger
+from backend.services.auth import get_current_user, is_admin
 
 
 router = APIRouter(prefix="/api/keywords", tags=["关键词管理"])
@@ -113,18 +114,21 @@ class GenerateQuestionsRequest(BaseModel):
 # ==================== 项目API ====================
 
 @router.get("/projects", response_model=List[ProjectResponse])
-async def list_projects(db: Session = Depends(get_db)):
+async def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取项目列表
 
     注意：返回所有活跃项目！
     """
-    projects = db.query(Project).filter(Project.status == 1).order_by(Project.created_at.desc()).all()
+    query = db.query(Project).filter(Project.status == 1)
+    if not is_admin(current_user):
+        query = query.filter(Project.owner_id == current_user.id)
+    projects = query.order_by(Project.created_at.desc()).all()
     return projects
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
-async def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
+async def create_project(project_data: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     创建项目
 
@@ -135,7 +139,8 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
         company_name=project_data.company_name,
         domain_keyword=project_data.domain_keyword,  # 保存领域关键词
         description=project_data.description,
-        industry=project_data.industry
+        industry=project_data.industry,
+        owner_id=current_user.id,
     )
     db.add(project)
     db.commit()
@@ -146,21 +151,31 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
-async def get_project(project_id: int, db: Session = Depends(get_db)):
+async def get_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取项目详情"""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    query = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        query = query.filter(Project.owner_id == current_user.id)
+    project = query.first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
     return project
 
 
 @router.get("/projects/{project_id}/keywords", response_model=List[KeywordResponse])
-async def get_project_keywords(project_id: int, db: Session = Depends(get_db)):
+async def get_project_keywords(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取项目的所有关键词
 
     注意：只返回活跃状态的关键词！
     """
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        project_query = project_query.filter(Project.owner_id == current_user.id)
+    project = project_query.first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
     keywords = db.query(Keyword).filter(
         Keyword.project_id == project_id,
         Keyword.status == "active"
@@ -173,7 +188,8 @@ async def get_project_keywords(project_id: int, db: Session = Depends(get_db)):
 @router.post("/distill", response_model=ApiResponse)
 async def distill_keywords(
     request: DistillRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     蒸馏关键词
@@ -182,7 +198,10 @@ async def distill_keywords(
     注意：这是AI驱动的核心功能！
     """
     # 验证项目存在
-    project = db.query(Project).filter(Project.id == request.project_id).first()
+    project_query = db.query(Project).filter(Project.id == request.project_id)
+    if not is_admin(current_user):
+        project_query = project_query.filter(Project.owner_id == current_user.id)
+    project = project_query.first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
@@ -205,7 +224,8 @@ async def distill_keywords(
         keyword = service.add_keyword(
             project_id=request.project_id,
             keyword=kw_data.get("keyword", ""),
-            difficulty_score=kw_data.get("difficulty_score")
+            difficulty_score=kw_data.get("difficulty_score"),
+            owner_id=current_user.id,
         )
         saved_keywords.append({
             "id": keyword.id,
@@ -223,7 +243,8 @@ async def distill_keywords(
 @router.post("/generate-questions", response_model=ApiResponse)
 async def generate_questions(
     request: GenerateQuestionsRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     生成问题变体
@@ -232,7 +253,10 @@ async def generate_questions(
     注意：问题变体越多，检测结果越准确！
     """
     # 验证关键词存在
-    keyword = db.query(Keyword).filter(Keyword.id == request.keyword_id).first()
+    keyword_query = db.query(Keyword).filter(Keyword.id == request.keyword_id)
+    if not is_admin(current_user):
+        keyword_query = keyword_query.filter(Keyword.owner_id == current_user.id)
+    keyword = keyword_query.first()
     if not keyword:
         raise HTTPException(status_code=404, detail="关键词不存在")
 
@@ -248,7 +272,8 @@ async def generate_questions(
     for question in questions:
         qv = service.add_question_variant(
             keyword_id=request.keyword_id,
-            question=question
+            question=question,
+            owner_id=current_user.id,
         )
         saved_questions.append({
             "id": qv.id,
@@ -263,14 +288,17 @@ async def generate_questions(
 
 
 @router.get("/keywords/{keyword_id}/questions", response_model=List[QuestionVariantResponse])
-async def get_keyword_questions(keyword_id: int, db: Session = Depends(get_db)):
+async def get_keyword_questions(keyword_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取关键词的所有问题变体
 
     注意：返回值用于AI平台收录检测！
     """
     # 验证关键词存在
-    keyword = db.query(Keyword).filter(Keyword.id == keyword_id).first()
+    keyword_query = db.query(Keyword).filter(Keyword.id == keyword_id)
+    if not is_admin(current_user):
+        keyword_query = keyword_query.filter(Keyword.owner_id == current_user.id)
+    keyword = keyword_query.first()
     if not keyword:
         raise HTTPException(status_code=404, detail="关键词不存在")
 
@@ -281,13 +309,16 @@ async def get_keyword_questions(keyword_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/keywords/{keyword_id}", response_model=ApiResponse)
-async def delete_keyword(keyword_id: int, db: Session = Depends(get_db)):
+async def delete_keyword(keyword_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     删除关键词（软删除）
 
     注意：这是软删除，数据不会真正删除！
     """
-    keyword = db.query(Keyword).filter(Keyword.id == keyword_id).first()
+    keyword_query = db.query(Keyword).filter(Keyword.id == keyword_id)
+    if not is_admin(current_user):
+        keyword_query = keyword_query.filter(Keyword.owner_id == current_user.id)
+    keyword = keyword_query.first()
     if not keyword:
         raise HTTPException(status_code=404, detail="关键词不存在")
 
@@ -302,7 +333,8 @@ async def delete_keyword(keyword_id: int, db: Session = Depends(get_db)):
 async def create_keyword(
     project_id: int,
     keyword_data: KeywordCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建关键词
@@ -310,14 +342,18 @@ async def create_keyword(
     注意：为指定项目添加新关键词！
     """
     # 验证项目存在
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        project_query = project_query.filter(Project.owner_id == current_user.id)
+    project = project_query.first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     keyword = Keyword(
         project_id=project_id,
         keyword=keyword_data.keyword,
-        difficulty_score=keyword_data.difficulty_score
+        difficulty_score=keyword_data.difficulty_score,
+        owner_id=current_user.id,
     )
     db.add(keyword)
     db.commit()
@@ -331,14 +367,18 @@ async def create_keyword(
 async def update_project(
     project_id: int,
     project_data: ProjectCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新项目
 
     注意：更新项目信息！
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        project_query = project_query.filter(Project.owner_id == current_user.id)
+    project = project_query.first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
@@ -355,13 +395,16 @@ async def update_project(
 
 
 @router.delete("/projects/{project_id}", response_model=ApiResponse)
-async def delete_project(project_id: int, db: Session = Depends(get_db)):
+async def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     删除项目（软删除）
 
     注意：这是软删除，数据不会真正删除！
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        project_query = project_query.filter(Project.owner_id == current_user.id)
+    project = project_query.first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
@@ -373,13 +416,16 @@ async def delete_project(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/questions/{question_id}", response_model=ApiResponse)
-async def delete_question(question_id: int, db: Session = Depends(get_db)):
+async def delete_question(question_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     删除问题变体
 
     注意：这是永久删除！
     """
-    question = db.query(QuestionVariant).filter(QuestionVariant.id == question_id).first()
+    question_query = db.query(QuestionVariant).filter(QuestionVariant.id == question_id)
+    if not is_admin(current_user):
+        question_query = question_query.filter(QuestionVariant.owner_id == current_user.id)
+    question = question_query.first()
     if not question:
         raise HTTPException(status_code=404, detail="问题变体不存在")
 

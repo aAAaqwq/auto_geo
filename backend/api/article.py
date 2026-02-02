@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.database.models import Article
+from backend.database.models import Article, User
 from backend.schemas import ArticleCreate, ArticleUpdate, ArticleResponse, ArticleListResponse, ApiResponse
 from loguru import logger
+from backend.services.auth import get_current_user, is_admin
 from sqlalchemy import func
 
 
@@ -24,7 +25,8 @@ async def get_articles(
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     status: Optional[int] = Query(None, description="状态筛选"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取文章列表
@@ -33,6 +35,8 @@ async def get_articles(
     """
     query = db.query(Article)
 
+    if not is_admin(current_user):
+        query = query.filter(Article.owner_id == current_user.id)
     if status is not None:
         query = query.filter(Article.status == status)
 
@@ -52,9 +56,12 @@ async def get_articles(
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
-async def get_article(article_id: int, db: Session = Depends(get_db)):
+async def get_article(article_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取文章详情"""
-    article = db.query(Article).filter(Article.id == article_id).first()
+    query = db.query(Article).filter(Article.id == article_id)
+    if not is_admin(current_user):
+        query = query.filter(Article.owner_id == current_user.id)
+    article = query.first()
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
 
@@ -66,13 +73,14 @@ async def get_article(article_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ArticleResponse, status_code=201)
-async def create_article(article_data: ArticleCreate, db: Session = Depends(get_db)):
+async def create_article(article_data: ArticleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     创建文章
 
     注意：初始状态为草稿！
     """
     article = Article(
+        owner_id=current_user.id,
         title=article_data.title,
         content=article_data.content,
         tags=article_data.tags,
@@ -92,10 +100,14 @@ async def create_article(article_data: ArticleCreate, db: Session = Depends(get_
 async def update_article(
     article_id: int,
     article_data: ArticleUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新文章"""
-    article = db.query(Article).filter(Article.id == article_id).first()
+    query = db.query(Article).filter(Article.id == article_id)
+    if not is_admin(current_user):
+        query = query.filter(Article.owner_id == current_user.id)
+    article = query.first()
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
 
@@ -123,13 +135,16 @@ async def update_article(
 
 
 @router.delete("/{article_id}", response_model=ApiResponse)
-async def delete_article(article_id: int, db: Session = Depends(get_db)):
+async def delete_article(article_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     删除文章
 
     注意：删除会级联删除相关的发布记录！
     """
-    article = db.query(Article).filter(Article.id == article_id).first()
+    query = db.query(Article).filter(Article.id == article_id)
+    if not is_admin(current_user):
+        query = query.filter(Article.owner_id == current_user.id)
+    article = query.first()
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
 
@@ -141,9 +156,12 @@ async def delete_article(article_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{article_id}/publish", response_model=ApiResponse)
-async def mark_published(article_id: int, db: Session = Depends(get_db)):
+async def mark_published(article_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """标记文章为已发布"""
-    article = db.query(Article).filter(Article.id == article_id).first()
+    query = db.query(Article).filter(Article.id == article_id)
+    if not is_admin(current_user):
+        query = query.filter(Article.owner_id == current_user.id)
+    article = query.first()
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
 
