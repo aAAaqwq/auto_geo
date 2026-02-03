@@ -112,3 +112,5 @@ release/
 scripts/*.js
 scripts/*.py
 *.bat
+scripts/mock_n8n_server.py
+scripts/generate_data.py

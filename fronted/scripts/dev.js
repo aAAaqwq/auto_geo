@@ -81,7 +81,7 @@ setTimeout(() => {
     shell: true,
     stdio: 'inherit',
     cwd: rootDir,
-    env: { ...process.env, ELECTRON_RENDERER_URL: 'http://localhost:5173' }
+    env: { ...process.env, ELECTRON_RENDERER_URL: 'http://localhost:3000' }
   })
 
   electronProcess.on('error', (err) => {
