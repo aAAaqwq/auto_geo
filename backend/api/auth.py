@@ -1,0 +1,332 @@
+# -*- coding: utf-8 -*-
+"""
+授权相关的API端点
+处理AI平台的授权流程
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from typing import List, Dict, Any
+
+from backend.database.models import User, Project
+from backend.database import get_db
+from backend.services.auth_service import auth_service
+from backend.services.session_manager import secure_session_manager
+
+router = APIRouter(
+    prefix="/api/auth",
+    tags=["auth"],
+    responses={404: {"description": "Not found"}},
+)
+
+
+@router.post("/start-flow")
+async def start_auth_flow(
+    user_id: int = Body(..., description="用户ID"),
+    project_id: int = Body(..., description="项目ID"),
+    platforms: List[str] = Body(..., description="要授权的平台列表"),
+    db: Session = Depends(get_db)
+):
+    """
+    开始授权流程
+    
+    Args:
+        user_id: 用户ID
+        project_id: 项目ID
+        platforms: 要授权的平台列表
+        db: 数据库会话
+        
+    Returns:
+        授权流程信息
+    """
+    try:
+        # 验证用户和项目
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
+        
+        # 开始授权流程
+        result = await auth_service.start_auth_flow(
+            user_id=user_id,
+            project_id=project_id,
+            platforms=platforms
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "开始授权流程失败"),
+                headers={"X-Error-Code": result.get("error_code", "UNKNOWN_ERROR")}
+            )
+        
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.get("/status/{auth_session_id}")
+async def get_auth_status(auth_session_id: str):
+    """
+    获取授权状态
+    
+    Args:
+        auth_session_id: 授权会话ID
+        
+    Returns:
+        授权状态
+    """
+    try:
+        result = await auth_service.get_auth_status(auth_session_id)
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=404,
+                detail=result.get("error", "授权会话不存在"),
+                headers={"X-Error-Code": result.get("error_code", "SESSION_NOT_FOUND")}
+            )
+        
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post("/start-platform/{auth_session_id}")
+async def start_platform_auth(
+    auth_session_id: str,
+    platform: str = Query(..., description="平台标识")
+):
+    """
+    开始单个平台的授权
+    
+    Args:
+        auth_session_id: 授权会话ID
+        platform: 平台标识
+        
+    Returns:
+        授权URL和状态
+    """
+    try:
+        result = await auth_service.start_platform_auth(
+            auth_session_id=auth_session_id,
+            platform=platform
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "开始平台授权失败"),
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+            )
+        
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post("/complete-platform/{auth_session_id}")
+async def complete_platform_auth(
+    auth_session_id: str,
+    platform: str = Query(..., description="平台标识")
+):
+    """
+    完成平台授权
+    
+    Args:
+        auth_session_id: 授权会话ID
+        platform: 平台标识
+        
+    Returns:
+        授权结果
+    """
+    try:
+        result = await auth_service.complete_platform_auth(
+            auth_session_id=auth_session_id,
+            platform=platform
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "完成平台授权失败"),
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+            )
+        
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post("/cancel/{auth_session_id}")
+async def cancel_auth_flow(auth_session_id: str):
+    """
+    取消授权流程
+    
+    Args:
+        auth_session_id: 授权会话ID
+        
+    Returns:
+        取消结果
+    """
+    try:
+        result = await auth_service.cancel_auth_flow(auth_session_id)
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "取消授权流程失败"),
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+            )
+        
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.get("/sessions")
+async def list_sessions(
+    user_id: int = Query(..., description="用户ID"),
+    project_id: int = Query(None, description="项目ID")
+):
+    """
+    列出用户/项目的所有会话
+    
+    Args:
+        user_id: 用户ID
+        project_id: 项目ID（可选）
+        
+    Returns:
+        会话列表
+    """
+    try:
+        result = await secure_session_manager.list_sessions(
+            user_id=user_id,
+            project_id=project_id
+        )
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": result
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.get("/session/status")
+async def get_session_status(
+    user_id: int = Query(..., description="用户ID"),
+    project_id: int = Query(..., description="项目ID"),
+    platform: str = Query(..., description="平台标识"),
+    fast: bool = Query(False, description="是否快速检查（仅检查文件存在性）")
+):
+    """
+    获取单个平台的会话状态
+    
+    Args:
+        user_id: 用户ID
+        project_id: 项目ID
+        platform: 平台标识
+        fast: 是否快速检查
+        
+    Returns:
+        会话状态详情
+    """
+    try:
+        if fast:
+            result = await secure_session_manager.get_session_status_fast(
+                user_id=user_id,
+                project_id=project_id,
+                platform=platform
+            )
+        else:
+            result = await secure_session_manager.get_session_status(
+                user_id=user_id,
+                project_id=project_id,
+                platform=platform
+            )
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": result
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.delete("/session")
+async def delete_session(
+    user_id: int = Body(..., description="用户ID"),
+    project_id: int = Body(..., description="项目ID"),
+    platform: str = Body(..., description="平台标识")
+):
+    """
+    删除会话
+    
+    Args:
+        user_id: 用户ID
+        project_id: 项目ID
+        platform: 平台标识
+        
+    Returns:
+        删除结果
+    """
+    try:
+        result = await secure_session_manager.delete_session(
+            user_id=user_id,
+            project_id=project_id,
+            platform=platform
+        )
+        
+        if not result:
+            raise HTTPException(status_code=400, detail="删除会话失败")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "会话删除成功"
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
+@router.post("/cleanup")
+async def cleanup_auth_sessions():
+    """
+    清理过期的授权会话
+    
+    Returns:
+        清理结果
+    """
+    try:
+        await auth_service.cleanup_expired_sessions()
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "过期会话清理完成"
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")

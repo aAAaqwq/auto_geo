@@ -16,7 +16,13 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/DashboardPage.vue'),
-        meta: { title: '概览', icon: 'House' },
+        meta: { title: '首页', icon: 'House' }, // 原来的概览改为首页，避免名字冲突
+      },
+      {
+        path: 'data-report',
+        name: 'DataReport',
+        component: () => import('@/views/report/DataReport.vue'),
+        meta: { title: '数据报表', icon: 'DataAnalysis' },
       },
       {
         path: 'accounts',
@@ -66,7 +72,24 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/settings/SettingsPage.vue'),
         meta: { title: '设置', icon: 'Setting' },
       },
+// ==================== [新增] 智能建站模块 ====================
+      {
+        path: 'site-builder',
+        name: 'SiteBuilder',
+        component: () => import('@/views/site-builder/ConfigWizard.vue'),
+        meta: { title: '智能建站', icon: 'Platform' }, // 图标建议用 Platform 或 Brush
+      },
+      // ===========================================================
+
+
       // ==================== GEO系统路由 ====================
+      // 🌟 新增：数据概览（仪表盘）放在GEO的第一位
+      {
+        path: 'geo/dashboard',
+        name: 'GeoDashboard',
+        component: () => import('@/views/geo/Dashboard.vue'),
+        meta: { title: '数据概览', icon: 'PieChart' }, 
+      },
       {
         path: 'geo/projects',
         name: 'GeoProjects',

@@ -1,38 +1,83 @@
 # -*- coding: utf-8 -*-
 """
-数据模型定义
-用SQLAlchemy ORM，类型安全！
+数据模型定义 - 工业级完整版
+包含基础发布、GEO、监控、知识库及AI招聘所有表结构
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, func, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, func, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from backend.database import Base
+from datetime import datetime
 
 # 表参数：允许扩展现有表
 TABLE_ARGS = {"extend_existing": True}
 
 
 class Account(Base):
-    """
-    账号表
-    存储各平台账号信息和授权状态
-    """
+    """账号表"""
     __tablename__ = "accounts"
     __table_args__ = TABLE_ARGS
 
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform = Column(String(50), nullable=False, index=True)
+    account_name = Column(String(100), nullable=False)
+    username = Column(String(100), nullable=True)  # 平台内的用户名
+    cookies = Column(Text, nullable=True)
+    storage_state = Column(Text, nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    status = Column(Integer, default=1)
+    last_auth_time = Column(DateTime, nullable=True)
+    remark = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # 关联关系
+    publish_records = relationship("PublishRecord", back_populates="account", cascade="all, delete-orphan")
+
+
+class ScheduledTask(Base):
+    """
+    定时任务配置表
+    """
+    __tablename__ = "scheduled_tasks"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, comment="任务名称")
+    task_key = Column(String(50), unique=True, nullable=False, comment="任务标识符(代码中对应key)")
+    cron_expression = Column(String(50), nullable=False, comment="Cron表达式")
+    is_active = Column(Boolean, default=True, comment="是否启用")
+    description = Column(Text, nullable=True, comment="任务描述")
+
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<Task {self.name} : {self.cron_expression}>"
+
+
+class Candidate(Base):
+    """
+    AI招聘候选人表
+    存储n8n AI招聘流程筛选的候选人数据
+    """
+    __tablename__ = "candidates"
+    __table_args__ = TABLE_ARGS
+
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    platform = Column(String(50), nullable=False, index=True, comment="平台ID：zhihu/baijiahao/sohu/toutiao")
-    account_name = Column(String(100), nullable=False, comment="账号备注名称")
-    username = Column(String(100), nullable=True, comment="登录账号/用户名")
+    uid = Column(String(100), unique=True, nullable=False, index=True, comment="候选人唯一标识（来自招聘平台）")
+    detail = Column(Text, nullable=True, comment="候选人详细信息（JSON格式）")
 
-    # 授权相关（加密存储）
-    cookies = Column(Text, nullable=True, comment="加密的Cookies")
-    storage_state = Column(Text, nullable=True, comment="加密的本地存储状态")
-    user_agent = Column(String(500), nullable=True, comment="浏览器UA")
+    # 附件相关
+    attached = Column(Text, nullable=True, comment="附件信息（JSON格式，存储简历链接等）")
 
-    # 状态相关
-    status = Column(Integer, default=1, comment="账号状态：1=正常 0=禁用 -1=授权过期")
-    last_auth_time = Column(DateTime, nullable=True, comment="最后授权时间")
+    # 发送状态
+    is_send = Column(Boolean, default=False, comment="是否已发送文章/消息")
+
+    # 关联文章（可选：如果发送了文章，记录文章ID）
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="SET NULL"), nullable=True, comment="关联的文章ID")
+
+    # 状态
+    status = Column(Integer, default=1, comment="状态：1=有效 0=无效 -1=已删除")
 
     # 备注
     remark = Column(Text, nullable=True, comment="备注信息")
@@ -40,9 +85,10 @@ class Account(Base):
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+    sent_at = Column(DateTime, nullable=True, comment="发送时间")
 
     def __repr__(self):
-        return f"<Account {self.platform}:{self.account_name}>"
+        return f"<Candidate uid={self.uid} is_send={self.is_send}>"
 
 
 class Article(Base):
@@ -74,6 +120,9 @@ class Article(Base):
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     published_at = Column(DateTime, nullable=True, comment="首次发布时间")
+
+    # 关联关系
+    publish_records = relationship("PublishRecord", back_populates="article", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Article {self.title}>"
@@ -111,6 +160,10 @@ class PublishRecord(Base):
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     published_at = Column(DateTime, nullable=True, comment="实际发布时间")
 
+    # 关联关系
+    article = relationship("Article", back_populates="publish_records")
+    account = relationship("Account", back_populates="publish_records")
+
     def __repr__(self):
         return f"<PublishRecord article_id={self.article_id} account_id={self.account_id} status={self.publish_status}>"
 
@@ -139,6 +192,9 @@ class Project(Base):
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 
+    # 关联关系
+    keywords = relationship("Keyword", back_populates="project", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<Project {self.name}>"
 
@@ -162,6 +218,12 @@ class Keyword(Base):
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
 
+    # 关联关系
+    project = relationship("Project", back_populates="keywords")
+    articles = relationship("GeoArticle", back_populates="keyword", cascade="all, delete-orphan")
+    question_variants = relationship("QuestionVariant", back_populates="keyword", cascade="all, delete-orphan")
+    index_records = relationship("IndexCheckRecord", back_populates="keyword", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<Keyword {self.keyword}>"
 
@@ -180,6 +242,9 @@ class QuestionVariant(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
+
+    # 关联关系
+    keyword = relationship("Keyword", back_populates="question_variants")
 
     def __repr__(self):
         return f"<QuestionVariant {self.question[:30]}...>"
@@ -205,6 +270,9 @@ class IndexCheckRecord(Base):
 
     # 时间戳
     check_time = Column(DateTime, default=func.now(), comment="检测时间")
+
+    # 关联关系
+    keyword = relationship("Keyword", back_populates="index_records")
 
     def __repr__(self):
         return f"<IndexCheckRecord keyword_id={self.keyword_id} platform={self.platform}>"
@@ -232,10 +300,25 @@ class GeoArticle(Base):
     # 发布相关
     platform = Column(String(50), nullable=True, comment="目标发布平台")
     publish_status = Column(String(20), default="draft", comment="发布状态：draft=草稿 published=已发布 failed=发布失败")
+    publish_time = Column(DateTime, nullable=True, comment="发布时间")
+
+    # 强壮性与重试 (Added back from v1)
+    retry_count = Column(Integer, default=0)
+    error_msg = Column(Text, nullable=True)
+    publish_logs = Column(Text, nullable=True)
+    platform_url = Column(String(500), nullable=True)
+
+    # 效果监测 (Added back from v1)
+    index_status = Column(String(20), default="uncheck")
+    last_check_time = Column(DateTime, nullable=True)
+    index_details = Column(Text, nullable=True)
 
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+
+    # 关联关系
+    keyword = relationship("Keyword", back_populates="articles")
 
     def __repr__(self):
         return f"<GeoArticle id={self.id} keyword_id={self.keyword_id}>"
@@ -265,6 +348,9 @@ class KnowledgeCategory(Base):
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 
+    # 关联关系
+    items = relationship("Knowledge", back_populates="category", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<KnowledgeCategory {self.name}>"
 
@@ -290,43 +376,100 @@ class Knowledge(Base):
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 
+    # 关联关系
+    category = relationship("KnowledgeCategory", back_populates="items")
+
     def __repr__(self):
         return f"<Knowledge {self.title}>"
 
-# ==================== AI招聘候选人相关表 ====================
 
-class Candidate(Base):
+# ==================== 用户相关表 ====================
+
+class User(Base):
     """
-    AI招聘候选人表
-    存储n8n AI招聘流程筛选的候选人数据
+    用户表
+    存储系统用户信息
     """
-    __tablename__ = "candidates"
+    __tablename__ = "users"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    uid = Column(String(100), unique=True, nullable=False, index=True, comment="候选人唯一标识（来自招聘平台）")
-    detail = Column(Text, nullable=True, comment="候选人详细信息（JSON格式）")
+    username = Column(String(100), nullable=False, unique=True, comment="用户名")
+    email = Column(String(200), nullable=True, unique=True, comment="邮箱")
+    password_hash = Column(String(200), nullable=True, comment="密码哈希")
+    
+    # 状态
+    status = Column(Integer, default=1, comment="状态：1=活跃 0=禁用")
+    
+    # 时间戳
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 
-    # 附件相关（修复拼写：attached 不是 attatched）
-    attached = Column(Text, nullable=True, comment="附件信息（JSON格式，存储简历链接等）")
+    def __repr__(self):
+        return f"<User {self.username}>"
 
-    # 发送状态
-    is_send = Column(Boolean, default=False, comment="是否已发送文章/消息")
 
-    # 关联文章（可选：如果发送了文章，记录文章ID）
-    article_id = Column(Integer, ForeignKey("articles.id", ondelete="SET NULL"), nullable=True, comment="关联的文章ID")
+# ==================== 参考文章表（爆火文章收集）====================
+
+class ReferenceArticle(Base):
+    """
+    参考文章表
+    存储从各平台采集的爆火/热门文章，用于内容创作参考
+    """
+    __tablename__ = "reference_articles"
+    __table_args__ = TABLE_ARGS
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+
+    # 基本信息
+    title = Column(String(500), nullable=False, comment="文章标题")
+    url = Column(String(1000), nullable=False, unique=True, comment="原文链接")
+    content = Column(Text, nullable=False, comment="文章正文（已清洗）")
+    summary = Column(Text, nullable=True, comment="文章摘要")
+
+    # 来源信息
+    platform = Column(String(50), nullable=False, index=True, comment="来源平台：zhihu/toutiao等")
+    author = Column(String(200), nullable=True, comment="作者名称")
+    publish_time = Column(String(50), nullable=True, comment="原文发布时间")
+
+    # 热度指标
+    likes = Column(Integer, default=0, comment="点赞数")
+    reads = Column(Integer, default=0, comment="阅读量")
+    comments = Column(Integer, default=0, comment="评论数")
+
+    # 采集信息
+    keyword = Column(String(200), nullable=True, index=True, comment="采集时使用的关键词")
+    collected_at = Column(DateTime, default=func.now(), comment="采集时间")
+
+    # RAGFlow 同步状态
+    ragflow_synced = Column(Boolean, default=False, comment="是否已同步到RAGFlow")
+    ragflow_doc_id = Column(String(100), nullable=True, comment="RAGFlow文档ID")
+    ragflow_sync_time = Column(DateTime, nullable=True, comment="RAGFlow同步时间")
 
     # 状态
-    status = Column(Integer, default=1, comment="状态：1=有效 0=无效 -1=已删除")
-
-    # 备注
-    remark = Column(Text, nullable=True, comment="备注信息")
+    status = Column(Integer, default=1, comment="状态：1=正常 0=已删除")
 
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
-    sent_at = Column(DateTime, nullable=True, comment="发送时间")
 
     def __repr__(self):
-        return f"<Candidate uid={self.uid} is_send={self.is_send}>"
+        return f"<ReferenceArticle {self.title[:30]}... ({self.platform})>"
 
+# ==================== AEO网站信息收集表 ====================
+class SiteProject(Base):
+    __tablename__ = "site_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, comment="项目名称，如：极速物流官网")
+    site_id = Column(String, unique=True, index=True, comment="唯一标识，用于生成路径")
+    
+    # 核心配置：存储前端传来的那个大 JSON
+    config_data = Column(JSON, comment="网站的全量配置数据")
+    
+    # 状态管理
+    deploy_path = Column(String, nullable=True, comment="生成的本地 index.html 路径")
+    preview_url = Column(String, nullable=True, comment="本地预览 URL")
+    
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

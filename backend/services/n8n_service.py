@@ -1,63 +1,64 @@
+# -*- coding: utf-8 -*-
 """
-n8n 服务封装
-把所有 AI 调用都通过 n8n webhook 转发，解耦 AI 逻辑
-作者: 老王
-创建时间: 2025-01-22
+n8n 服务封装 - 终极加固调试版
+1. 解决 n8n 返回非 JSON 格式导致的程序崩溃
+2. 增加原始响应日志，方便排查 Basic LLM Chain 的输出问题
+3. 适配多种 n8n 返回结构 (List, Dict, 纯文本)
 """
 
 import httpx
-from typing import Any, Literal
+import json
+from typing import Any, Literal, Optional, List, Dict
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ==================== 配置 ====================
 
 class N8nConfig:
-    """n8n 配置"""
-    # n8n webhook 基础地址
+    # 🌟 n8n Webhook 基础地址
     WEBHOOK_BASE = "http://localhost:5678/webhook"
 
     # 超时配置
-    TIMEOUT_SHORT = 30.0   # 简单任务超时
-    TIMEOUT_LONG = 120.0   # 文章生成超时
+    TIMEOUT_SHORT = 45.0  # 蒸馏、分析等任务稍微加长一点
+    TIMEOUT_LONG = 300.0  # 长文章生成
 
     # 重试配置
-    MAX_RETRIES = 2
-    RETRY_DELAY = 1.0
+    MAX_RETRIES = 1
 
 
 # ==================== 请求模型 ====================
 
 class KeywordDistillRequest(BaseModel):
-    """关键词蒸馏请求"""
-    keywords: list[str] = Field(..., description="待蒸馏的关键词列表")
-    project_id: int | None = Field(None, description="项目ID")
+    # 兼容旧版：以列表形式传递上下文
+    keywords: Optional[List[str]] = None
+    project_id: Optional[int] = None
+
+    # 通用版：适配 n8n "AutoGeo-关键词蒸馏-通用版" 工作流
+    core_kw: Optional[str] = None
+    target_info: Optional[str] = None
+    prefixes: Optional[str] = None
+    suffixes: Optional[str] = None
 
 
 class GenerateQuestionsRequest(BaseModel):
-    """生成问题变体请求"""
-    question: str = Field(..., description="原始问题")
-    count: int = Field(10, ge=1, le=50, description="生成数量")
+    question: str
+    count: int = 10
 
 
 class GeoArticleRequest(BaseModel):
-    """GEO文章生成请求"""
-    keyword: str = Field(..., description="目标关键词")
-    platform: Literal["zhihu", "baijiahao", "sohu", "toutiao"] = Field(
-        "zhihu", description="目标平台"
-    )
-    requirements: str = Field("", description="补充要求")
-    word_count: int = Field(1200, ge=500, le=3000, description="字数要求")
+    keyword: str
+    platform: str = "zhihu"
+    requirements: str = ""
+    word_count: int = 1200
 
 
 class IndexCheckAnalysisRequest(BaseModel):
-    """收录分析请求"""
-    keyword: str = Field(..., description="关键词")
-    doubao_indexed: bool = Field(..., description="豆包是否收录")
-    qianwen_indexed: bool = Field(..., description="千问是否收录")
-    deepseek_indexed: bool = Field(..., description="DeepSeek是否收录")
-    history: list[dict] = Field(default_factory=list, description="历史数据")
+    keyword: str
+    doubao_indexed: bool
+    qianwen_indexed: bool
+    deepseek_indexed: bool
+    history: List[Dict] = []
 
 
 # ==================== 响应模型 ====================
@@ -65,9 +66,11 @@ class IndexCheckAnalysisRequest(BaseModel):
 class N8nResponse(BaseModel):
     """n8n 统一响应格式"""
     status: Literal["success", "error", "processing"]
-    data: dict[str, Any] | None = None
-    error: str | None = None
-    timestamp: str | None = None
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    timestamp: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== 服务类 ====================
@@ -75,218 +78,174 @@ class N8nResponse(BaseModel):
 class N8nService:
     """
     n8n 服务类
-    老王我封装了一层，以后调用 AI 就不用管底层是啥了
+    集成日志推送，支持自动化流水线的实时监控
     """
 
-    def __init__(self, config: N8nConfig | None = None):
+    def __init__(self, config: Optional[N8nConfig] = None):
         self.config = config or N8nConfig()
-        self.client = httpx.AsyncClient(timeout=self.config.TIMEOUT_SHORT)
+        # 🌟 绑定模块名，用于前端实时日志
+        self.log = logger.bind(module="AI中台")
+        self._client: Optional[httpx.AsyncClient] = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=self.config.TIMEOUT_SHORT,
+                follow_redirects=True
+            )
+        return self._client
 
     async def close(self):
-        """关闭客户端"""
-        await self.client.aclose()
+        """关闭 HTTP 客户端"""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
     async def _call_webhook(
-        self,
-        webhook_path: str,
-        payload: dict[str, Any],
-        timeout: float | None = None
+            self,
+            endpoint: str,
+            payload: Dict[str, Any],
+            timeout: Optional[float] = None
     ) -> N8nResponse:
-        """
-        调用 n8n webhook 的通用方法
+        """底层统一调用逻辑"""
+        path = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+        url = f"{self.config.WEBHOOK_BASE}{path}"
+        timeout_val = timeout or self.config.TIMEOUT_SHORT
 
-        Args:
-            webhook_path: webhook 路径
-            payload: 请求载荷
-            timeout: 超时时间
-
-        Returns:
-            N8nResponse: 统一响应格式
-        """
-        url = f"{self.config.WEBHOOK_BASE}{webhook_path}"
-        timeout = timeout or self.config.TIMEOUT_SHORT
+        self.log.info(f"🛰️ 正在外发 AI 请求: {endpoint}...")
 
         for attempt in range(self.config.MAX_RETRIES + 1):
             try:
-                logger.info(f"[n8n] 调用 webhook: {webhook_path}, 尝试 {attempt + 1}")
-                response = await self.client.post(url, json=payload, timeout=timeout)
-                response.raise_for_status()
+                response = await self.client.post(url, json=payload, timeout=timeout_val)
 
-                data = response.json()
-                return N8nResponse(**data)
+                # 获取原始文本，这是调试的关键！
+                raw_text = response.text
+
+                # 1. 检查 HTTP 状态码
+                if response.status_code != 200:
+                    err_msg = f"HTTP {response.status_code}: {raw_text[:200]}"
+                    self.log.error(f"❌ n8n 返回错误: {err_msg}")
+                    return N8nResponse(status="error", error=err_msg)
+
+                # 2. 尝试解析 JSON
+                try:
+                    res_data = response.json()
+
+                    # 如果 n8n 返回的是数组格式（n8n 默认行为），取第一个
+                    if isinstance(res_data, list):
+                        res_data = res_data[0] if len(res_data) > 0 else {}
+
+                    # 兼容性处理：如果返回结果里没有 status 字段，我们手动包装一层
+                    if isinstance(res_data, dict) and "status" not in res_data:
+                        return N8nResponse(status="success", data=res_data)
+
+                    # 按照标准模型解析
+                    return N8nResponse(**res_data)
+
+                except json.JSONDecodeError:
+                    # 🌟 报错现场捕捉：打印 n8n 吐出的真实内容
+                    self.log.error(f"❌ n8n 响应不是有效的 JSON 格式！")
+                    self.log.error(f"🔍 原始响应内容如下:\n{raw_text}")
+
+                    # 特殊情况处理：如果 n8n 没配 Respond to Webhook，默认会返回 "Workflow started"
+                    if "Workflow was started" in raw_text or "Workflow started" in raw_text:
+                        return N8nResponse(status="error",
+                                           error="n8n工作流缺少 'Respond to Webhook' 节点，无法接收AI数据")
+
+                    return N8nResponse(status="error", error=f"JSON解析失败: {raw_text[:100]}")
 
             except httpx.TimeoutException:
-                logger.warning(f"[n8n] 超时: {webhook_path}")
+                self.log.warning(f"⏳ 请求超时 (尝试 {attempt + 1}/{self.config.MAX_RETRIES + 1})")
                 if attempt == self.config.MAX_RETRIES:
-                    return N8nResponse(
-                        status="error",
-                        error=f"请求超时 ({timeout}s)",
-                        data=None
-                    )
-
-            except httpx.HTTPStatusError as e:
-                logger.error(f"[n8n] HTTP错误: {e.response.status_code}")
-                return N8nResponse(
-                    status="error",
-                    error=f"HTTP {e.response.status_code}",
-                    data=None
-                )
+                    return N8nResponse(status="error", error="AI 生成超时，请检查 n8n 资源占用")
 
             except Exception as e:
-                logger.error(f"[n8n] 异常: {e}")
-                if attempt == self.config.MAX_RETRIES:
-                    return N8nResponse(
-                        status="error",
-                        error=str(e),
-                        data=None
-                    )
+                self.log.error(f"🚨 传输层异常: {str(e)}")
+                return N8nResponse(status="error", error=str(e))
+
+        return N8nResponse(status="error", error="未知错误")
+
+    # ==================== 业务方法 ====================
 
     async def distill_keywords(
-        self,
-        keywords: list[str],
-        project_id: int | None = None
+            self,
+            *,
+            core_kw: Optional[str] = None,
+            target_info: Optional[str] = None,
+            prefixes: Optional[str] = None,
+            suffixes: Optional[str] = None,
+            keywords: Optional[List[str]] = None,
+            project_id: Optional[int] = None
     ) -> N8nResponse:
-        """
-        关键词蒸馏
-        把一堆破词儿提炼成有价值的 SEO 关键词
+        """关键词蒸馏"""
+        self.log.info(f"🧹 正在蒸馏提纯关键词...")
 
-        Args:
-            keywords: 原始关键词列表
-            project_id: 项目ID
+        payload = KeywordDistillRequest(
+            keywords=keywords,
+            project_id=project_id,
+            core_kw=core_kw,
+            target_info=target_info,
+            prefixes=prefixes,
+            suffixes=suffixes,
+        ).model_dump(exclude_none=True)
 
-        Returns:
-            包含核心词、长尾词的响应
-        """
-        request = KeywordDistillRequest(keywords=keywords, project_id=project_id)
-        return await self._call_webhook(
-            "/keyword-distill",
-            request.model_dump(),
-            timeout=self.config.TIMEOUT_SHORT
-        )
+        return await self._call_webhook("keyword-distill", payload)
 
-    async def generate_questions(
-        self,
-        question: str,
-        count: int = 10
-    ) -> N8nResponse:
-        """
-        生成问题变体
-        一个问题变出N种问法，覆盖更多搜索意图
-
-        Args:
-            question: 原始问题
-            count: 生成数量
-
-        Returns:
-            包含问题变体列表的响应
-        """
-        request = GenerateQuestionsRequest(question=question, count=count)
-        return await self._call_webhook(
-            "/generate-questions",
-            request.model_dump(),
-            timeout=self.config.TIMEOUT_SHORT
-        )
+    async def generate_questions(self, question: str, count: int = 10) -> N8nResponse:
+        """生成问题变体"""
+        self.log.info(f"❓ 正在基于原题扩展变体...")
+        payload = GenerateQuestionsRequest(question=question, count=count).model_dump()
+        return await self._call_webhook("generate-questions", payload)
 
     async def generate_geo_article(
-        self,
-        keyword: str,
-        platform: str = "zhihu",
-        requirements: str = "",
-        word_count: int = 1200
+            self,
+            keyword: str,
+            platform: str = "zhihu",
+            requirements: str = "",
+            word_count: int = 1200
     ) -> N8nResponse:
-        """
-        生成 GEO 优化文章
-        用 AI 写文章，SEO 优化到位
-
-        Args:
-            keyword: 目标关键词
-            platform: 发布平台
-            requirements: 额外要求
-            word_count: 字数要求
-
-        Returns:
-            包含标题、内容、SEO评分的响应
-        """
-        request = GeoArticleRequest(
+        """生成 GEO 优化文章 (长任务)"""
+        self.log.info(f"📝 正在撰写适用于 [{platform}] 的 GEO 文章...")
+        payload = GeoArticleRequest(
             keyword=keyword,
             platform=platform,
             requirements=requirements,
             word_count=word_count
-        )
+        ).model_dump()
+
         return await self._call_webhook(
-            "/geo-article-generate",
-            request.model_dump(),
+            "geo-article-generate",
+            payload,
             timeout=self.config.TIMEOUT_LONG
         )
 
     async def analyze_index_check(
-        self,
-        keyword: str,
-        doubao_indexed: bool,
-        qianwen_indexed: bool,
-        deepseek_indexed: bool,
-        history: list[dict] | None = None
+            self,
+            keyword: str,
+            doubao_indexed: bool,
+            qianwen_indexed: bool,
+            deepseek_indexed: bool,
+            history: Optional[List[Dict]] = None
     ) -> N8nResponse:
-        """
-        分析收录检测结果
-        AI 分析收录情况，给出优化建议
-
-        Args:
-            keyword: 关键词
-            doubao_indexed: 豆包收录状态
-            qianwen_indexed: 千问收录状态
-            deepseek_indexed: DeepSeek收录状态
-            history: 历史数据
-
-        Returns:
-            包含分析和预警的响应
-        """
-        request = IndexCheckAnalysisRequest(
+        """分析收录结果"""
+        self.log.info(f"📊 正在请求 AI 深度分析收录趋势...")
+        payload = IndexCheckAnalysisRequest(
             keyword=keyword,
             doubao_indexed=doubao_indexed,
             qianwen_indexed=qianwen_indexed,
             deepseek_indexed=deepseek_indexed,
             history=history or []
-        )
-        return await self._call_webhook(
-            "/index-check-analysis",
-            request.model_dump(),
-            timeout=self.config.TIMEOUT_SHORT
-        )
+        ).model_dump()
+        return await self._call_webhook("index-check-analysis", payload)
 
 
-# ==================== 单例实例 ====================
+# ==================== 单例模式 ====================
 
-_n8n_service: N8nService | None = None
+_instance: Optional[N8nService] = None
 
 
 async def get_n8n_service() -> N8nService:
-    """获取 n8n 服务单例"""
-    global _n8n_service
-    if _n8n_service is None:
-        _n8n_service = N8nService()
-    return _n8n_service
-
-
-# ==================== 测试代码 ====================
-
-async def main():
-    """测试 n8n 服务是否连通"""
-    service = await get_n8n_service()
-
-    # 测试关键词蒸馏
-    result = await service.distill_keywords(
-        keywords=["Python教程", "怎么学Python", "Python入门"]
-    )
-
-    if result.status == "success":
-        logger.info(f"✅ 关键词蒸馏成功: {result.data}")
-    else:
-        logger.error(f"❌ 关键词蒸馏失败: {result.error}")
-
-    await service.close()
-
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    global _instance
+    if _instance is None:
+        _instance = N8nService()
+    return _instance

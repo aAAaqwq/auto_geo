@@ -11,7 +11,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 <style>
 /* 全局样式 */
-hl,
+html,
 body,
 #app {
   margin: 0;
