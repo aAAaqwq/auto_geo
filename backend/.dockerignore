@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+.git/
+.gitignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Database (will be mounted as volume)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs (will be mounted as volume)
+*.log
+logs/
+
+# Environment (production uses env vars)
+.env
+.env.local
+
+# Documentation
+docs/
+*.md
+
+# Static files that shouldn't be in container
+node_modules/
