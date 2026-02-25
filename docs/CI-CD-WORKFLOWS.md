@@ -128,7 +128,7 @@ Backend CI通过3个job确保后端代码质量：
 - **扫描工具**: Trivy
 - **扫描范围**: `./backend` 目录
 - **输出格式**: SARIF
-- **上传**: GitHub Security (CodeQL @v3)
+- **上传**: GitHub Security (CodeQL @v4)
 - **检查内容**:
   - 已知漏洞 (CVE) 扫描
   - 依赖包安全漏洞
@@ -154,9 +154,12 @@ Backend CI通过3个job确保后端代码质量：
 
 - **第2次尝试**: 在security job级别添加permissions配置 ✅
   - **修复**: 添加job级别的`permissions: contents: read, security-events: write`
-  - **结果**: Security Scan现在应该能正常上传SARIF结果
 
-- **额外修复**: 升级CodeQL Action从v2到v3（v3将在2026年12月弃用，后续需升级到v4）
+- **第3次修复**: 升级CodeQL Action版本到v4 ✅
+  - **v3 → v4**: 直接升级到最新稳定版
+  - **v3 vs v4区别**:
+    - v3 (2022): 功能完整但已进入维护期，2026年12月弃用
+    - v4 (2025): 最新稳定版，性能更优，推荐所有项目使用
 
 **如果还不行**: 检查GitHub仓库设置
 ```
