@@ -11,6 +11,11 @@ on:
     paths:
       - 'backend/**'
 
+# 老王备注：添加权限配置，让Security Scan能正常上传结果
+permissions:
+  contents: read
+  security-events: write
+
 env:
   PYTHON_VERSION: '3.12'
 
@@ -106,7 +111,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
         if: always()
