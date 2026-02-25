@@ -101,6 +101,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read  # 老王备注：修复telemetry权限问题
 
     steps:
       - name: Checkout
@@ -110,16 +111,13 @@ jobs:
           fetch-depth: 0
 
       # 老王备注：Gitleaks检测代码中的密钥泄露、硬编码密码、API密钥等
-      # 老王备注（2026-02-25）：组织账号需要Gitleaks许可证，暂时允许失败
-      # 修复步骤：
-      #   1. 访问 https://gitleaks.io 注册免费许可证
-      #   2. 添加到GitHub Secrets: GITLEAKS_LICENSE
-      #   3. 取消下面的注释并移除allow-failed
-      # - name: Run Gitleaks
-      #   uses: gitleaks/gitleaks-action@v2
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # 组织账号必需
+      # 老王备注（2026-02-25）：组织账号需要GITLEAKS_LICENSE许可证
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # 组织账号必需
+        continue-on-error: true  # 老王备注：允许失败，避免阻塞Trivy运行
 
       # 老王备注：Trivy检测依赖包的已知漏洞（CVE）
       - name: Run Trivy
@@ -129,9 +127,10 @@ jobs:
           scan-ref: './backend'
           format: 'sarif'
           output: 'trivy-results.sarif'
+        # 老王备注：即使Gitleaks失败，Trivy也要运行（检测依赖漏洞）
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
-        if: always()
+        if: always()  # 老王备注：即使Trivy失败，也尝试上传（避免文件不存在错误）
