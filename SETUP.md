@@ -294,11 +294,13 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
    - 验证关键API可用性
 
 2. **前端启动检查**：
-   - 安装Node.js依赖
+   - 安装Node.js依赖（使用Electron国内镜像）
    - 自动修复Electron path.txt
    - 构建渲染进程
    - 构建Electron主进程
-   - 验证可执行文件存在
+   - 验证Electron可执行文件存在
+   - 验证构建输出完整性
+   - **⚠️ 注意**：CI环境无GUI，不启动Electron窗口，只验证构建成功
 
 3. **依赖验证**：
    - 检查requirements.txt
