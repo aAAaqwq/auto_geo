@@ -160,21 +160,20 @@ RUN useradd -m -u 1000 -s /bin/bash autogeo && \
     mkdir -p /app/data /app/logs /app/.cookies /app/backend/database /app/backend/static && \
     chown -R autogeo:autogeo /app
 
-# 设置工作目录
-WORKDIR /app
-
 # 从 builder 复制虚拟环境和 Playwright
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /ms-playwright /ms-playwright
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 复制应用代码（老王备注：从项目根目录复制，保持backend目录结构）
-# 艹！Docker context在./backend，所以需要创建backend子目录
+# 复制应用代码
+# 老王备注：Docker context在./backend，所以backend内容会复制到/app/backend/
 RUN mkdir -p /app/backend
 COPY --chown=autogeo:autogeo . /app/backend/
 
-# 设置PYTHONPATH
-ENV PYTHONPATH="/app:/app/backend"
+# 设置PYTHONPATH和工作目录
+# 老王备注：PYTHONPATH=/app 让 from backend.xxx import 正常工作
+ENV PYTHONPATH="/app"
+WORKDIR /app/backend
 
 # 切换到非 root 用户（安全最佳实践）
 USER autogeo
@@ -182,11 +181,9 @@ USER autogeo
 # 暴露端口
 EXPOSE 8001
 
-# 健康检查（老王备注：路径统一为 /api/health）
+# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8001/api/health || exit 1
 
 # 启动命令
-# 老王备注：用-m方式启动，让Python正确处理模块路径
-# -m backend.main 会把/backend添加到sys.path
-CMD ["python", "-m", "backend.main"]
+CMD ["python", "main.py"]
