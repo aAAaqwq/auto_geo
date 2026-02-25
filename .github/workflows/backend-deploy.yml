@@ -140,12 +140,12 @@ jobs:
               echo "✅ 旧容器已停止"
             fi
 
-            # 创建数据目录（老王我补充：数据库和cookies都要持久化！）
+            # 创建数据目录（老王备注：确保容器内用户可写）
             echo "📁 创建数据目录..."
             mkdir -p ~/autogeo/data ~/autogeo/logs ~/autogeo/database ~/autogeo/cookies
 
-            # 修复权限问题（容器内UID=1000）
-            chmod -R 755 ~/autogeo
+            # 修复权限（简单粗暴：给所有人写权限）
+            chmod -R 777 ~/autogeo
 
             # 启动新容器
             echo "🚀 启动新容器..."
@@ -162,13 +162,38 @@ jobs:
               -e PYTHONUNBUFFERED=1 \
               $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest
 
-            # 等待服务启动（Playwright需要更长时间）
-            echo "⏳ 等待服务启动（40秒）..."
-            sleep 40
-
-            # 检查容器状态
+            # 立即检查容器状态（老王备注：不要傻等，立即诊断）
             echo "🔍 检查容器状态..."
-            docker ps -a | grep $CONTAINER_NAME || echo "容器未找到！"
+            sleep 5
+            CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "not_found")
+            echo "容器状态: $CONTAINER_STATUS"
+
+            # 如果容器已退出，打印日志
+            if [ "$CONTAINER_STATUS" = "exited" ]; then
+                echo "❌ 容器启动后立即退出！"
+                echo "=== 容器日志 ==="
+                docker logs $CONTAINER_NAME --tail 50
+                exit 1
+            fi
+
+            # 等待服务启动（减少等待时间，多次检查）
+            echo "⏳ 等待服务启动..."
+            for i in {1..12}; do
+                sleep 5
+                if curl -f http://localhost:$PORT/api/health > /dev/null 2>&1; then
+                    echo "✅ 服务启动成功！"
+                    break
+                fi
+                # 每5秒检查一次容器状态
+                CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "not_found")
+                if [ "$CONTAINER_STATUS" = "exited" ]; then
+                    echo "❌ 容器在启动过程中退出！"
+                    echo "=== 容器日志 ==="
+                    docker logs $CONTAINER_NAME --tail 50
+                    exit 1
+                fi
+                echo "等待中... ($i/12)"
+            done
 
             # 健康检查
             echo "🔍 健康检查..."
@@ -178,8 +203,10 @@ jobs:
               echo "📊 API 文档: http://$(hostname -I | awk '{print $1}'):$PORT/docs"
             else
               echo "❌ 后端服务启动失败！"
+              echo "=== 容器状态 ==="
+              docker ps -a | grep $CONTAINER_NAME
               echo "=== 容器日志 ==="
-              docker logs $CONTAINER_NAME
+              docker logs $CONTAINER_NAME --tail 100
               exit 1
             fi
 
