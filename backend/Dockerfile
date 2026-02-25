@@ -156,8 +156,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # 创建应用用户（安全最佳实践）
+# 老王备注：创建独立的数据目录，不要和代码目录混在一起！
+# /app/database - 数据库文件存储（独立挂载）
+# /app/backend - 代码目录（不要挂载，否则会覆盖代码！）
 RUN useradd -m -u 1000 -s /bin/bash autogeo && \
-    mkdir -p /app/data /app/logs /app/.cookies /app/backend/database /app/backend/static && \
+    mkdir -p /app/data /app/logs /app/database /app/.cookies /app/backend/static && \
     chown -R autogeo:autogeo /app
 
 # 从 builder 复制虚拟环境和 Playwright

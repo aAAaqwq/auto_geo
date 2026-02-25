@@ -248,6 +248,9 @@ jobs:
             echo ""
             echo "📁 第五步：准备数据目录..."
 
+            # 老王备注：创建独立的数据目录，不要覆盖代码目录！
+            # /app/database - 数据库文件（独立挂载，不覆盖代码）
+            # /app/backend - 代码目录（不要挂载！）
             mkdir -p ~/autogeo/data ~/autogeo/logs ~/autogeo/database ~/autogeo/cookies
             chmod -R 777 ~/autogeo
             echo "✅ 数据目录准备完成"
@@ -269,7 +272,7 @@ jobs:
               -p $PORT:8001 \
               -v ~/autogeo/data:/app/data \
               -v ~/autogeo/logs:/app/logs \
-              -v ~/autogeo/database:/app/backend/database \
+              -v ~/autogeo/database:/app/database \
               -v ~/autogeo/cookies:/app/.cookies \
               -e ENVIRONMENT=production \
               -e HOST=0.0.0.0 \

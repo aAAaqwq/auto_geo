@@ -15,7 +15,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 加载环境变量
 load_dotenv(BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / ".cookies"
-DATABASE_DIR = BASE_DIR / "backend" / "database"
+
+# 老王备注：数据库目录需要和代码目录分离，否则 Docker 挂载会覆盖代码！
+# 本地开发: backend/database/
+# Docker 环境: /app/database/ (独立目录，不覆盖代码)
+_DOCKER_DB_DIR = Path("/app/database")
+if _DOCKER_DB_DIR.exists() or os.getenv("ENVIRONMENT") == "production":
+    # Docker 环境：使用独立的数据目录
+    DATABASE_DIR = _DOCKER_DB_DIR
+else:
+    # 本地开发环境：使用 backend/database
+    DATABASE_DIR = BASE_DIR / "backend" / "database"
 
 # 确保目录存在
 DATA_DIR.mkdir(exist_ok=True)

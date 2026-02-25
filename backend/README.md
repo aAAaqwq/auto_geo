@@ -101,7 +101,7 @@ docker run -d \
   -p 8001:8001 \
   -v ~/autogeo/data:/app/data \
   -v ~/autogeo/logs:/app/logs \
-  -v ~/autogeo/database:/app/backend/database \
+  -v ~/autogeo/database:/app/database \
   -v ~/autogeo/cookies:/app/.cookies \
   -e ENVIRONMENT=production \
   -e HOST=0.0.0.0 \
