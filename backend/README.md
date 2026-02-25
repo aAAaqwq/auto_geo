@@ -76,6 +76,54 @@ python main.py
 | GET | `/api/platforms` | 支持的平台列表 |
 | WS | `/ws` | WebSocket 连接 |
 
+## Docker 部署
+
+### 镜像仓库
+
+| 仓库 | 地址 | 说明 |
+|-----|------|------|
+| 阿里云ACR（广州） | `crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend` | 优先使用 |
+| GHCR | `ghcr.io/architecture-matrix/auto_geo_backend` | 备用 |
+
+### 手动部署
+
+```bash
+# 拉取镜像（阿里云ACR优先）
+docker pull crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend:latest
+
+# 创建数据目录
+mkdir -p ~/autogeo/data ~/autogeo/logs ~/autogeo/database ~/autogeo/cookies
+
+# 启动容器
+docker run -d \
+  --name autogeo-backend \
+  --restart unless-stopped \
+  -p 8001:8001 \
+  -v ~/autogeo/data:/app/data \
+  -v ~/autogeo/logs:/app/logs \
+  -v ~/autogeo/database:/app/backend/database \
+  -v ~/autogeo/cookies:/app/.cookies \
+  -e ENVIRONMENT=production \
+  -e HOST=0.0.0.0 \
+  -e PYTHONUNBUFFERED=1 \
+  -e N8N_BASE_URL=https://n8n.opencaio.cn \
+  -e RAGFLOW_BASE_URL=https://ragflow.xinzhixietong.com \
+  crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend:latest
+```
+
+### 健康检查
+
+```bash
+# 检查容器状态
+docker ps | grep autogeo-backend
+
+# 检查服务健康
+curl http://localhost:8001/api/health
+
+# 查看日志
+docker logs autogeo-backend --tail 100 -f
+```
+
 ## 目录结构
 
 ```
@@ -105,4 +153,4 @@ backend/
 
 ---
 
-**更新日期**: 2025-01-13
+**更新日期**: 2026-02-25

@@ -2,7 +2,7 @@
 
 > **老王备注**：这个文档详细说明从零开始设置AutoGeo项目的每一步！clone下来就能跑，艹！
 
-**更新日期**: 2026-02-24
+**更新日期**: 2026-02-25
 **维护者**: 老王
 
 ---
@@ -279,8 +279,44 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 | **Startup Validation** | push/PR | ✅ 后端启动<br>✅ 前端构建<br>✅ 依赖检查<br>✅ 文档检查 | `.github/workflows/startup-validation.yml` |
 | **Frontend CI** | push/PR到frontend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 构建验证 | `.github/workflows/frontend-ci.yml` |
 | **Backend CI** | push/PR到backend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 安全扫描 | `.github/workflows/backend-ci.yml` |
-| **Backend Deploy** | push到master | ✅ Docker构建<br>✅ 推送镜像<br>✅ 自动部署 | `.github/workflows/backend-deploy.yml` |
+| **Backend Deploy** | push到main | ✅ Docker构建<br>✅ 推送到阿里云ACR<br>✅ 自动部署到服务器 | `.github/workflows/backend-deploy.yml` |
 | **Frontend Release** | 发布Release | ✅ 打包应用<br>✅ 构建安装包 | `.github/workflows/frontend-release.yml` |
+
+#### Backend Deploy 部署流程
+
+**老王备注**：这个SB工作流负责后端自动部署，使用阿里云ACR加速镜像拉取！
+
+**部署架构**：
+```
+GitHub Actions → 构建Docker镜像
+                      ├── 推送到 GHCR (备用)
+                      └── 推送到 阿里云ACR (优先) ⚡
+
+服务器部署 → 优先从阿里云ACR拉取（广州内网速度飞快）
+                  └── 失败则从GHCR拉取
+```
+
+**镜像仓库地址**：
+| 仓库 | 地址 | 说明 |
+|-----|------|------|
+| 阿里云ACR（广州） | `crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend` | 优先拉取，速度快 |
+| GHCR | `ghcr.io/architecture-matrix/auto_geo_backend` | 备用仓库 |
+
+**所需GitHub Secrets**：
+| Secret名称 | 说明 | 获取方式 |
+|-----------|------|---------|
+| `ALIYUN_ACR_USERNAME` | 阿里云账号全名（如 xxx@aliyun.com） | 阿里云控制台 |
+| `ALIYUN_ACR_PASSWORD` | ACR Registry登录密码 | [访问凭证设置](https://cr.console.aliyun.com/) → 设置Registry登录密码 |
+| `SERVER_HOST` | 服务器IP地址 | - |
+| `SERVER_USER` | SSH登录用户名 | - |
+| `SERVER_SSH_KEY` | SSH私钥 | `cat ~/.ssh/id_rsa` |
+| `BACKEND_PORT` | 后端端口（可选，默认8001） | - |
+
+**部署策略**：
+1. 先拉取新镜像（失败不影响旧服务）
+2. 镜像拉取成功后才停止旧容器
+3. 启动新容器并健康检查
+4. 自动清理旧镜像
 
 #### 启动验证工作流详解
 
