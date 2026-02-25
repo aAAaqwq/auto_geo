@@ -256,12 +256,14 @@ jobs:
   dependency-check:
     name: 📦 Dependency Validation
     runs-on: ubuntu-latest
+    # 老王备注（2026-02-25）：dependency-review-action只在PR时运行，tag推送会报错
+    if: github.event_name == 'pull_request'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 老王备注（2026-02-25）：添加前端依赖安全检查
+      # 老王备注（2026-02-25）：添加前端依赖安全检查（仅PR时）
       - name: Frontend Dependency Review
         uses: actions/dependency-review-action@v4
         with:
