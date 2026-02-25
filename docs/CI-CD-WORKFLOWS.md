@@ -13,7 +13,7 @@ AutoGeo项目使用GitHub Actions进行自动化CI/CD，确保代码质量和自
 | Workflow | 触发条件 | 运行时间 | 状态 |
 |----------|---------|---------|------|
 | **Startup Validation** | 每次push、PR | ~2分钟 | ✅ |
-| **Backend CI** | backend代码变更 | ~1分钟 | ✅ |
+| **Backend CI** | backend代码变更 | ~2分钟 | ✅ |
 | **Frontend CI** | frontend代码变更 | ~3分钟 | ✅ |
 | **Dependency Review** | PR到master/dev | ~1分钟 | ✅ |
 | **Electron Build** | tag推送、手动触发 | ~15分钟 | ✅ |
@@ -76,6 +76,23 @@ AutoGeo项目使用GitHub Actions进行自动化CI/CD，确保代码质量和自
 
 对backend代码进行**代码质量检查、类型检查、单元测试和安全扫描**。
 
+### 检查内容总览
+
+Backend CI通过3个job确保后端代码质量：
+
+| Job | 检查内容 | 工具 | 预期时间 |
+|-----|---------|------|---------|
+| **Lint & Type Check** | 代码规范、格式、类型 | Ruff, MyPy | ~30s |
+| **Unit Tests** | 单元测试、覆盖率 | pytest | ~40s |
+| **Security Scan** | 安全漏洞 | Trivy | ~30s |
+
+**关键检查项**：
+- ✅ 代码符合Ruff规范（PEP 8 + 自定义规则）
+- ✅ 代码格式正确（ruff format）
+- ✅ 类型注解正确（mypy）
+- ✅ 单元测试通过（pytest）
+- ✅ 无已知安全漏洞（Trivy）
+
 ### Jobs
 
 #### 1. Lint & Type Check (代码检查)
@@ -111,7 +128,23 @@ AutoGeo项目使用GitHub Actions进行自动化CI/CD，确保代码质量和自
 - **扫描工具**: Trivy
 - **扫描范围**: `./backend` 目录
 - **输出格式**: SARIF
-- **上传**: GitHub Security (CodeQL)
+- **上传**: GitHub Security (CodeQL @v3)
+- **检查内容**:
+  - 已知漏洞 (CVE) 扫描
+  - 依赖包安全漏洞
+  - 代码配置问题
+- **权限配置**:
+  ```yaml
+  permissions:
+    contents: read
+    security-events: write  # 上传安全扫描结果
+  ```
+
+**老王备注（2026-02-25修复记录）**：
+- **问题**: Security Scan报错"Resource not accessible by integration"
+- **原因**: workflow缺少`security-events: write`权限，CodeQL Action使用已弃用的v2版本
+- **修复**: 添加permissions配置，升级CodeQL Action从v2到v3
+- **结果**: Security Scan现在能正常上传SARIF结果到GitHub Security
 
 ---
 
