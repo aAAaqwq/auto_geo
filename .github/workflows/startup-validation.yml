@@ -152,11 +152,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./frontend
-        # 老王备注（2026-02-25）：使用npm install而非npm ci，确保Electron二进制文件下载
-        run: |
-          npm config set Electron Mirror https://npmmirror.com/mirrors/electron/
-          npm config set Electron Custom Dir "{{ root }}"
-          npm install
+        env:
+          # 老王备注（2026-02-25）：配置Electron国内镜像加速下载
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+        run: npm install
 
       # 老王备注：验证Electron二进制文件是否存在
       - name: Verify Electron binary exists
@@ -171,14 +170,15 @@ jobs:
 
           if [ ! -f "$ELECTRON_BIN" ]; then
             echo "❌ Electron binary not found at: $ELECTRON_BIN"
-            echo "Trying to download manually..."
-            npx electron-download --version=$(node -p "require('./package.json').devDependencies.electron.replace('^', '')")
+            echo "Trying to reinstall Electron..."
+            # 老王备注：重新安装Electron（会使用镜像）
+            npm rebuild electron
           fi
 
           # 再次检查
           if [ ! -f "$ELECTRON_BIN" ]; then
-            echo "❌ Electron binary still missing after download attempt"
-            ls -la node_modules/electron/dist/ || echo "dist directory doesn't exist"
+            echo "❌ Electron binary still missing after rebuild attempt"
+            ls -la node_modules/ | head -20 || echo "node_modules directory issue"
             exit 1
           fi
 
