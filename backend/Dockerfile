@@ -168,8 +168,13 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /ms-playwright /ms-playwright
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 复制应用代码（利用 Docker 缓存层）
-COPY --chown=autogeo:autogeo . .
+# 复制应用代码（老王备注：从项目根目录复制，保持backend目录结构）
+# 艹！Docker context在./backend，所以需要创建backend子目录
+RUN mkdir -p /app/backend
+COPY --chown=autogeo:autogeo . /app/backend/
+
+# 设置PYTHONPATH
+ENV PYTHONPATH="/app:/app/backend"
 
 # 切换到非 root 用户（安全最佳实践）
 USER autogeo
@@ -182,10 +187,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8001/api/health || exit 1
 
 # 启动命令
-# 老王备注：
-# - backend.main:app 是正确的模块路径
-# - --workers 1 用于生产环境（Playwright 不支持多进程）
-# - --log-level info 生产日志级别
+# 老王备注：代码在/app/backend/下，所以模块路径是backend.main
 CMD ["uvicorn", "backend.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8001", \
