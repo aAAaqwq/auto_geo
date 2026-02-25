@@ -235,13 +235,14 @@ if __name__ == "__main__":
     # Windows 下异步策略优化
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        logger.info(f"正在启动 {APP_NAME} v{APP_VERSION}...")
-        logger.info(f"服务地址: http://{HOST}:{PORT}")
 
-        uvicorn.run(
-            "backend.main:app",
-            host=HOST,
-            port=PORT,
-            reload=RELOAD,
-            log_level="info"
-        )
+    logger.info(f"正在启动 {APP_NAME} v{APP_VERSION}...")
+    logger.info(f"服务地址: http://{HOST}:{PORT}")
+
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        reload=RELOAD,
+        log_level="info"
+    )

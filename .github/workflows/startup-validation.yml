@@ -75,12 +75,12 @@ jobs:
 
       - name: Start backend server
         run: |
-          # 设置PYTHONPATH并后台启动服务器
-          PYTHONPATH=. python -m backend.main &
+          # 设置PYTHONPATH并后台启动服务器，记录日志
+          PYTHONPATH=. python -m backend.main > /tmp/backend.log 2>&1 &
           BACKEND_PID=$!
           echo "Backend PID: $BACKEND_PID"
 
-          # 等待服务器启动
+          # 等待服务器启动，同时显示日志
           for i in {1..30}; do
             if curl -f http://127.0.0.1:8001/ > /dev/null 2>&1; then
               echo "✅ Backend started successfully!"
@@ -88,7 +88,22 @@ jobs:
             fi
             echo "Waiting for backend... ($i/30)"
             sleep 2
+            # 每5次检查显示一次日志
+            if [ $((i % 5)) -eq 0 ]; then
+              echo "=== Backend Log (last 20 lines) ==="
+              tail -20 /tmp/backend.log || true
+              echo "==================================="
+            fi
           done
+
+          # 如果最终失败，显示完整日志
+          if ! curl -f http://127.0.0.1:8001/ > /dev/null 2>&1; then
+            echo "❌ Backend failed to start!"
+            echo "=== Full Backend Log ==="
+            cat /tmp/backend.log
+            echo "========================"
+            exit 1
+          fi
 
           # 健康检查
           curl -f http://127.0.0.1:8001/ || exit 1
@@ -101,12 +116,16 @@ jobs:
       - name: Check API endpoints
         run: |
           # 再次启动服务器进行API检查
-          PYTHONPATH=. python -m backend.main &
+          PYTHONPATH=. python -m backend.main > /tmp/backend_api.log 2>&1 &
           BACKEND_PID=$!
           sleep 10
 
           # 检查关键API端点
-          curl -f http://127.0.0.1:8001/api/platforms || exit 1
+          curl -f http://127.0.0.1:8001/api/platforms || {
+            echo "=== Backend Log ==="
+            cat /tmp/backend_api.log
+            exit 1
+          }
           curl -f http://127.0.0.1:8001/docs || exit 1
 
           kill $BACKEND_PID || true
@@ -172,7 +191,7 @@ jobs:
           else
             test -f "node_modules/electron/dist/electron"
           fi
-        shell: pwsh
+        shell: bash
 
       - name: Check build output
         working-directory: ./frontend
@@ -182,7 +201,7 @@ jobs:
           else
             test -f "out/electron/main/index.js"
           fi
-        shell: pwsh
+        shell: bash
 
       - name: Startup test (dev mode)
         working-directory: ./frontend
