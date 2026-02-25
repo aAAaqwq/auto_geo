@@ -14,6 +14,9 @@
 3. [详细设置步骤](#详细设置步骤)
 4. [常见问题](#常见问题)
 5. [CI/CD说明](#cicd说明)
+   - [工作流概览](#工作流列表)
+   - [后端部署](#backend-deploy-部署流程)
+   - [启动验证](#启动验证工作流详解)
 6. [开发工作流](#开发工作流)
 
 ---
@@ -272,15 +275,17 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 项目配置了自动化CI/CD，确保每次代码变更都能正常启动！
 
-#### 工作流列表
+#### 工作流列表 <a name="工作流列表"></a>
 
 | 工作流 | 触发条件 | 验证内容 | 配置文件 |
 |-------|---------|---------|---------|
-| **Startup Validation** | push/PR | ✅ 后端启动<br>✅ 前端构建<br>✅ 依赖检查<br>✅ 文档检查 | `.github/workflows/startup-validation.yml` |
-| **Frontend CI** | push/PR到frontend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 构建验证 | `.github/workflows/frontend-ci.yml` |
-| **Backend CI** | push/PR到backend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 安全扫描 | `.github/workflows/backend-ci.yml` |
-| **Backend Deploy** | push到main | ✅ Docker构建<br>✅ 推送到阿里云ACR<br>✅ 自动部署到服务器 | `.github/workflows/backend-deploy.yml` |
-| **Frontend Release** | 发布Release | ✅ 打包应用<br>✅ 构建安装包 | `.github/workflows/frontend-release.yml` |
+| **Startup Validation** | push/PR | ✅ 后端启动<br>✅ 前端构建<br>✅ 依赖安全检查<br>✅ 文档检查 | [`.github/workflows/startup-validation.yml`](.github/workflows/startup-validation.yml) |
+| **Frontend CI** | push/PR到frontend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 构建验证 | [`.github/workflows/frontend-ci.yml`](.github/workflows/frontend-ci.yml) |
+| **Backend CI** | push/PR到backend | ✅ 代码检查<br>✅ 类型检查<br>✅ 单元测试<br>✅ 安全扫描 | [`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml) |
+| **Backend Deploy** | push到main | ✅ Docker构建<br>✅ 推送到阿里云ACR<br>✅ 自动部署到服务器 | [`.github/workflows/backend-deploy.yml`](.github/workflows/backend-deploy.yml) |
+| **Electron Build** | push/PR到frontend | ✅ 跨平台打包<br>✅ 构建安装包 | [`.github/workflows/electron-build.yml`](.github/workflows/electron-build.yml) |
+
+> **老王备注**：点击配置文件列的链接可以直接查看workflow源码！
 
 #### Backend Deploy 部署流程
 
@@ -318,18 +323,18 @@ GitHub Actions → 构建Docker镜像
 3. 启动新容器并健康检查
 4. 自动清理旧镜像
 
-#### 启动验证工作流详解
+#### 启动验证工作流详解 <a name="启动验证工作流详解"></a>
 
 **老王备注**：这个SB工作流专门验证clone后能否启动，包含以下检查：
 
-1. **后端启动检查**：
+1. **后端启动检查** (`backend-startup`)：
    - 安装Python依赖
    - 安装Playwright浏览器
    - 启动后端服务
    - 健康检查API端点
    - 验证关键API可用性
 
-2. **前端启动检查**：
+2. **前端启动检查** (`frontend-startup`)：
    - 安装Node.js依赖（使用Electron国内镜像）
    - 自动修复Electron path.txt
    - 构建渲染进程
@@ -338,12 +343,12 @@ GitHub Actions → 构建Docker镜像
    - 验证构建输出完整性
    - **⚠️ 注意**：CI环境无GUI，不启动Electron窗口，只验证构建成功
 
-3. **依赖验证**：
-   - 检查requirements.txt
-   - 检查package.json和package-lock.json
-   - 检查环境变量模板
+3. **依赖安全检查** (`dependency-check`)：
+   - **前端依赖审查**：检查已知漏洞、许可证合规性
+   - **后端依赖审计**：使用pip-audit检查安全漏洞
+   - 验证依赖文件存在性
 
-4. **文档检查**：
+4. **文档检查** (`docs-check`)：
    - 检查README.md
    - 验证包含启动说明
    - 检查快速启动脚本

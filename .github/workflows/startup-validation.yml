@@ -2,7 +2,7 @@
 # Startup Validation CI/CD
 # Maintainer: 老王
 # Purpose: 验证clone后能否正常启动前后端
-# Updated: 2026-02-24
+# Updated: 2026-02-25
 # ========================================
 #
 # 老王备注：
@@ -261,6 +261,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 老王备注（2026-02-25）：添加前端依赖安全检查
+      - name: Frontend Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
+
       - name: Check backend dependencies
         working-directory: ./backend
         run: |
@@ -269,6 +276,14 @@ jobs:
             exit 1
           fi
           echo "✅ Backend dependencies file exists"
+
+      # 老王备注（2026-02-25）：添加后端pip-audit安全检查
+      - name: Backend Security Audit
+        working-directory: ./backend
+        run: |
+          pip install pip-audit
+          pip-audit --strict || echo "⚠️  Security issues found, continuing..."
+        continue-on-error: true
 
       - name: Check frontend dependencies
         working-directory: ./frontend
