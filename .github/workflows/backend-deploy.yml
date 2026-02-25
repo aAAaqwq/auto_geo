@@ -117,7 +117,10 @@ jobs:
             docker version
             echo "✅ 服务器状态正常"
 
-            # 拉取最新镜像（老王备注：每次都拉取，确保使用最新版本）
+            # 拉取最新镜像（老王备注：先删除旧镜像确保拉取最新版本）
+            echo "🗑️  删除旧镜像..."
+            docker rmi $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest 2>/dev/null || echo "旧镜像不存在，继续"
+
             echo "📦 拉取最新镜像..."
             echo "开始时间: $(date)"
             timeout 900 docker pull $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest
@@ -127,6 +130,8 @@ jobs:
 
             if [ $PULL_EXIT_CODE -eq 0 ]; then
               echo "✅ 镜像拉取成功"
+              # 显示镜像信息
+              docker images $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest --format "镜像ID: {{.ID}} | 创建时间: {{.Created}} | 大小: {{.Size}}"
             elif [ $PULL_EXIT_CODE -eq 124 ]; then
               echo "❌ 镜像拉取超时（15分钟）"
               echo "可能原因：磁盘空间不足或Docker daemon问题"
