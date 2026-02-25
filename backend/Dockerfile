@@ -69,9 +69,37 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
 
-# 安装 Playwright 浏览器
-RUN playwright install chromium && \
-    playwright install-deps chromium
+# 安装 Playwright 浏览器（老王备注：手动安装依赖避免Debian Trixie包名问题）
+RUN playwright install chromium
+
+# 手动安装Playwright依赖（不用playwright install-deps，因为Debian Trixie包名变了）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libxshmfence1 \
+    libatspi2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # ============================================
 # Stage 2: Runtime - 生产运行时
