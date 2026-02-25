@@ -35,12 +35,12 @@ class GeoArticleService:
         self.db = db
 
     async def generate(
-            self,
-            keyword_id: int,
-            company_name: str,
-            target_platforms: Optional[List[str]] = None,
-            publish_strategy: str = "draft",
-            scheduled_at: Optional[str] = None
+        self,
+        keyword_id: int,
+        company_name: str,
+        target_platforms: Optional[List[str]] = None,
+        publish_strategy: str = "draft",
+        scheduled_at: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         异步生成文章逻辑（异步回调模式）
@@ -61,14 +61,15 @@ class GeoArticleService:
             publish_status="generating",
             # 存储发布策略
             target_platforms=target_platforms,
-            publish_strategy=publish_strategy
+            publish_strategy=publish_strategy,
         )
 
         # 如果是定时发布，解析并设置定时时间
         if publish_strategy == "scheduled" and scheduled_at:
             from datetime import datetime
+
             try:
-                article.scheduled_at = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+                article.scheduled_at = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
             except Exception as e:
                 gen_log.warning(f"解析定时时间失败: {e}")
 
@@ -76,7 +77,9 @@ class GeoArticleService:
         self.db.commit()
         self.db.refresh(article)
 
-        gen_log.info(f"🆕 任务启动：为关键词 ID {keyword_id} (项目ID: {project_id}) 生成文章 (article_id: {article.id})")
+        gen_log.info(
+            f"🆕 任务启动：为关键词 ID {keyword_id} (项目ID: {project_id}) 生成文章 (article_id: {article.id})"
+        )
         gen_log.info(f"📋 发布策略: {publish_strategy}, 目标平台: {target_platforms}")
 
         try:
@@ -89,7 +92,7 @@ class GeoArticleService:
                 word_count=1200,
                 # 传递回调URL和article_id，n8n完成后将结果回调通知
                 callback_url=None,
-                article_id=article.id
+                article_id=article.id,
             )
 
             if n8n_res.status == "success":
@@ -159,10 +162,7 @@ class GeoArticleService:
             return False
 
         # 查找账号
-        account = self.db.query(Account).filter(
-            Account.platform == db_article.platform,
-            Account.status == 1
-        ).first()
+        account = self.db.query(Account).filter(Account.platform == db_article.platform, Account.status == 1).first()
 
         if not account or not account.storage_state:
             db_article.publish_status = "failed"
@@ -202,10 +202,7 @@ class GeoArticleService:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=False)
             try:
-                context = await browser.new_context(
-                    storage_state=state_data,
-                    viewport={"width": 1280, "height": 800}
-                )
+                context = await browser.new_context(storage_state=state_data, viewport={"width": 1280, "height": 800})
                 page = await context.new_page()
 
                 # 更新为发布中
@@ -258,7 +255,7 @@ class GeoArticleService:
                     "status": 2 if is_success else 3,
                     "publish_status": "published" if is_success else "failed",
                     "platform_url": final_url,
-                    "error_msg": error_msg
+                    "error_msg": error_msg,
                 }
                 await ws_manager.broadcast(ws_data)
 
@@ -272,7 +269,7 @@ class GeoArticleService:
                         publish_status=2 if is_success else 3,
                         platform_url=final_url,
                         error_msg=error_msg,
-                        published_at=now_time if is_success else None
+                        published_at=now_time if is_success else None,
                     )
                     self.db.add(record)
                     self.db.commit()
@@ -296,13 +293,15 @@ class GeoArticleService:
                         self.db.commit()
 
                         # 广播失败
-                        await ws_manager.broadcast({
-                            "type": "publish_progress",
-                            "article_id": target_article_id,
-                            "status": 3,
-                            "publish_status": "failed",
-                            "error_msg": str(e)
-                        })
+                        await ws_manager.broadcast(
+                            {
+                                "type": "publish_progress",
+                                "article_id": target_article_id,
+                                "status": 3,
+                                "publish_status": "failed",
+                                "error_msg": str(e),
+                            }
+                        )
                 except:
                     pass
                 return False
@@ -312,7 +311,8 @@ class GeoArticleService:
     async def check_quality(self, article_id: int) -> Dict[str, Any]:
         """质检逻辑"""
         article = self.get_article(article_id)
-        if not article: return {"success": False, "message": "文章不存在"}
+        if not article:
+            return {"success": False, "message": "文章不存在"}
 
         gen_log.info(f"📊 正在对文章 {article_id} 进行 AI 质量评估...")
         article.quality_score = random.randint(85, 98)

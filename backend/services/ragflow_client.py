@@ -34,10 +34,7 @@ class RAGFlowClient:
         self.dataset_id = os.getenv("RAGFLOW_DATASET_ID", "")
 
         self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        })
+        self.session.headers.update({"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"})
 
         # 超时配置
         self.timeout = 30
@@ -62,21 +59,13 @@ class RAGFlowClient:
         payload = {
             "name": name,
             "chunk_method": "naive",
-            "parser_config": {
-                "chunk_token_num": 8192,
-                "delimiter": "\\n\\n",
-                "layout_recognize": True
-            }
+            "parser_config": {"chunk_token_num": 8192, "delimiter": "\\n\\n", "layout_recognize": True},
         }
         if description:
             payload["description"] = description
 
         try:
-            resp = self.session.post(
-                f"{self.base_url}/api/v1/datasets",
-                json=payload,
-                timeout=self.timeout
-            )
+            resp = self.session.post(f"{self.base_url}/api/v1/datasets", json=payload, timeout=self.timeout)
             resp.raise_for_status()
             result = resp.json()
             logger.info(f"创建知识库成功: {name}")
@@ -100,11 +89,7 @@ class RAGFlowClient:
             params["name"] = name
 
         try:
-            resp = self.session.get(
-                f"{self.base_url}/api/v1/datasets",
-                params=params,
-                timeout=self.timeout
-            )
+            resp = self.session.get(f"{self.base_url}/api/v1/datasets", params=params, timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
@@ -156,16 +141,14 @@ class RAGFlowClient:
             file_name = f"{title[:50]}.txt"
 
             # 使用 multipart/form-data 上传
-            files = {
-                "file": (file_name, file_content.encode("utf-8"), "text/plain")
-            }
+            files = {"file": (file_name, file_content.encode("utf-8"), "text/plain")}
             headers = {"Authorization": f"Bearer {self.api_key}"}
 
             resp = requests.post(
                 f"{self.base_url}/api/v1/datasets/{dataset_id}/documents",
                 files=files,
                 headers=headers,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             resp.raise_for_status()
             result = resp.json()
@@ -198,7 +181,7 @@ class RAGFlowClient:
             resp = self.session.post(
                 f"{self.base_url}/api/v1/datasets/{dataset_id}/chunks",
                 json={"document_ids": document_ids},
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             resp.raise_for_status()
             result = resp.json()
@@ -221,9 +204,7 @@ class RAGFlowClient:
         """
         try:
             resp = self.session.get(
-                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents",
-                params=kwargs,
-                timeout=self.timeout
+                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents", params=kwargs, timeout=self.timeout
             )
             resp.raise_for_status()
             return resp.json()
@@ -234,11 +215,7 @@ class RAGFlowClient:
     # ==================== 检索（去重核心）====================
 
     def retrieve(
-        self,
-        question: str,
-        dataset_ids: List[str],
-        similarity_threshold: float = 0.85,
-        top_k: int = 1024
+        self, question: str, dataset_ids: List[str], similarity_threshold: float = 0.85, top_k: int = 1024
     ) -> Dict:
         """
         检索相似内容（用于去重）
@@ -262,9 +239,9 @@ class RAGFlowClient:
                     "vector_similarity_weight": 0.5,
                     "top_k": top_k,
                     "keyword": True,
-                    "highlight": True
+                    "highlight": True,
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             resp.raise_for_status()
             return resp.json()
@@ -273,10 +250,7 @@ class RAGFlowClient:
             return {"code": -1, "message": str(e)}
 
     def check_duplicate(
-        self,
-        content: str,
-        dataset_ids: List[str] = None,
-        threshold: float = 0.85
+        self, content: str, dataset_ids: List[str] = None, threshold: float = 0.85
     ) -> Tuple[bool, List[Dict]]:
         """
         检查文章是否重复
@@ -319,29 +293,21 @@ class RAGFlowClient:
             doc_id = chunk.get("document_id")
             if not doc_id:
                 continue
-                
+
             if doc_id not in articles:
                 articles[doc_id] = {
                     "document_id": doc_id,
                     "document_name": chunk.get("document_name") or chunk.get("docname") or f"Doc_{doc_id[:8]}",
                     "max_similarity": chunk.get("similarity"),
-                    "similar_content": chunk.get("content", "")[:200]
+                    "similar_content": chunk.get("content", "")[:200],
                 }
-            articles[doc_id]["max_similarity"] = max(
-                articles[doc_id]["max_similarity"],
-                chunk.get("similarity", 0)
-            )
+            articles[doc_id]["max_similarity"] = max(articles[doc_id]["max_similarity"], chunk.get("similarity", 0))
 
         return True, list(articles.values())
 
     # ==================== 聊天（文章生成）====================
 
-    def create_chat(
-        self,
-        name: str,
-        dataset_ids: List[str],
-        system_prompt: str = None
-    ) -> Dict:
+    def create_chat(self, name: str, dataset_ids: List[str], system_prompt: str = None) -> Dict:
         """
         创建聊天助手
 
@@ -353,31 +319,19 @@ class RAGFlowClient:
         Returns:
             API 响应
         """
-        payload = {
-            "name": name,
-            "dataset_ids": dataset_ids
-        }
+        payload = {"name": name, "dataset_ids": dataset_ids}
         if system_prompt:
             payload["prompt"] = [{"role": "system", "content": system_prompt}]
 
         try:
-            resp = self.session.post(
-                f"{self.base_url}/api/v1/chats",
-                json=payload,
-                timeout=self.timeout
-            )
+            resp = self.session.post(f"{self.base_url}/api/v1/chats", json=payload, timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
             logger.error(f"创建聊天助手失败: {e}")
             return {"code": -1, "message": str(e)}
 
-    def chat_completion(
-        self,
-        chat_id: str,
-        question: str,
-        stream: bool = False
-    ) -> Dict:
+    def chat_completion(self, chat_id: str, question: str, stream: bool = False) -> Dict:
         """
         发送对话请求
 
@@ -393,7 +347,7 @@ class RAGFlowClient:
             resp = self.session.post(
                 f"{self.base_url}/api/v1/chats/{chat_id}/completions",
                 json={"question": question, "stream": stream},
-                timeout=self.timeout * 2  # 对话可能需要更长时间
+                timeout=self.timeout * 2,  # 对话可能需要更长时间
             )
             resp.raise_for_status()
             return resp.json()

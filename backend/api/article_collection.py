@@ -23,8 +23,10 @@ router = APIRouter(prefix="/api/v1/collect", tags=["爆火文章收集"])
 
 # ==================== 请求/响应模型 ====================
 
+
 class CollectStartRequest(BaseModel):
     """开始采集请求"""
+
     keyword: str = Field(..., min_length=1, max_length=200, description="搜索关键词")
     platforms: List[str] = Field(..., min_items=1, description="目标平台列表，如 ['zhihu', 'toutiao']")
     min_likes: int = Field(default=100, ge=0, description="最低点赞数阈值")
@@ -36,6 +38,7 @@ class CollectStartRequest(BaseModel):
 
 class CollectTaskResponse(BaseModel):
     """采集任务响应"""
+
     task_id: str
     keyword: str
     platforms: List[str]
@@ -45,6 +48,7 @@ class CollectTaskResponse(BaseModel):
 
 class CollectResultResponse(BaseModel):
     """采集结果响应"""
+
     task_id: str
     keyword: str
     status: str
@@ -58,6 +62,7 @@ class CollectResultResponse(BaseModel):
 
 class ReferenceArticleResponse(BaseModel):
     """参考文章响应"""
+
     id: int
     title: str
     url: str
@@ -71,7 +76,7 @@ class ReferenceArticleResponse(BaseModel):
     ragflow_synced: bool = False
     collected_at: Optional[datetime] = None
 
-    @field_serializer('collected_at')
+    @field_serializer("collected_at")
     def serialize_collected_at(self, dt: datetime) -> str:
         return dt.isoformat() if dt else ""
 
@@ -81,18 +86,21 @@ class ReferenceArticleResponse(BaseModel):
 
 class ReferenceArticleListResponse(BaseModel):
     """参考文章列表响应"""
+
     total: int
     items: List[ReferenceArticleResponse]
 
 
 class DuplicateCheckRequest(BaseModel):
     """去重检查请求"""
+
     content: str = Field(..., min_length=10, description="待检查的内容")
     threshold: float = Field(default=0.85, ge=0.0, le=1.0, description="相似度阈值")
 
 
 class DuplicateCheckResponse(BaseModel):
     """去重检查响应"""
+
     checked: bool
     is_duplicate: bool
     threshold: float
@@ -108,12 +116,9 @@ _collect_tasks: dict = {}
 
 # ==================== API 接口 ====================
 
+
 @router.post("/start", response_model=CollectTaskResponse)
-async def start_collect(
-    request: CollectStartRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
-):
+async def start_collect(request: CollectStartRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     开始采集爆火文章
 
@@ -130,8 +135,7 @@ async def start_collect(
     invalid_platforms = [p for p in request.platforms if p not in supported_platforms]
     if invalid_platforms:
         raise HTTPException(
-            status_code=400,
-            detail=f"不支持的平台: {invalid_platforms}，支持的平台: {supported_platforms}"
+            status_code=400, detail=f"不支持的平台: {invalid_platforms}，支持的平台: {supported_platforms}"
         )
 
     # 创建任务ID
@@ -149,7 +153,7 @@ async def start_collect(
         "results": {},
         "error_msg": None,
         "created_at": datetime.now(),
-        "completed_at": None
+        "completed_at": None,
     }
 
     # 添加后台任务
@@ -162,7 +166,7 @@ async def start_collect(
         min_reads=request.min_reads,
         max_articles=request.max_articles_per_platform,
         save_to_db=request.save_to_db,
-        sync_to_ragflow=request.sync_to_ragflow
+        sync_to_ragflow=request.sync_to_ragflow,
     )
 
     logger.info(f"采集任务已创建: task_id={task_id}, keyword={request.keyword}, platforms={request.platforms}")
@@ -172,7 +176,7 @@ async def start_collect(
         keyword=request.keyword,
         platforms=request.platforms,
         status="pending",
-        message="采集任务已创建，正在后台执行"
+        message="采集任务已创建，正在后台执行",
     )
 
 
@@ -184,7 +188,7 @@ async def _execute_collect_task(
     min_reads: int,
     max_articles: int,
     save_to_db: bool,
-    sync_to_ragflow: bool
+    sync_to_ragflow: bool,
 ):
     """
     执行采集任务（后台任务）
@@ -195,6 +199,7 @@ async def _execute_collect_task(
     try:
         # 获取数据库会话
         from backend.database import SessionLocal
+
         db = SessionLocal()
 
         try:
@@ -209,19 +214,21 @@ async def _execute_collect_task(
                 min_reads=min_reads,
                 max_articles_per_platform=max_articles,
                 save_to_db=save_to_db,
-                sync_to_ragflow=sync_to_ragflow
+                sync_to_ragflow=sync_to_ragflow,
             )
 
             # 更新任务状态
-            _collect_tasks[task_id].update({
-                "status": "completed" if result["success"] else "failed",
-                "total_count": result.get("total_count", 0),
-                "saved_count": result.get("saved_count", 0),
-                "ragflow_synced_count": result.get("ragflow_synced_count", 0),
-                "results": result.get("results", {}),
-                "error_msg": result.get("error_msg"),
-                "completed_at": datetime.now()
-            })
+            _collect_tasks[task_id].update(
+                {
+                    "status": "completed" if result["success"] else "failed",
+                    "total_count": result.get("total_count", 0),
+                    "saved_count": result.get("saved_count", 0),
+                    "ragflow_synced_count": result.get("ragflow_synced_count", 0),
+                    "results": result.get("results", {}),
+                    "error_msg": result.get("error_msg"),
+                    "completed_at": datetime.now(),
+                }
+            )
 
             logger.info(f"采集任务完成: task_id={task_id}, total={result.get('total_count', 0)}")
 
@@ -230,11 +237,7 @@ async def _execute_collect_task(
 
     except Exception as e:
         logger.error(f"采集任务失败: task_id={task_id}, error={e}")
-        _collect_tasks[task_id].update({
-            "status": "failed",
-            "error_msg": str(e),
-            "completed_at": datetime.now()
-        })
+        _collect_tasks[task_id].update({"status": "failed", "error_msg": str(e), "completed_at": datetime.now()})
 
 
 @router.get("/status/{task_id}", response_model=CollectResultResponse)
@@ -263,15 +266,12 @@ async def get_collect_status(task_id: str):
         ragflow_synced_count=task.get("ragflow_synced_count", 0),
         results=task.get("results", {}),
         error_msg=task.get("error_msg"),
-        completed_at=task.get("completed_at")
+        completed_at=task.get("completed_at"),
     )
 
 
 @router.get("/tasks", response_model=List[CollectResultResponse])
-async def list_collect_tasks(
-    status: Optional[str] = None,
-    limit: int = 20
-):
+async def list_collect_tasks(status: Optional[str] = None, limit: int = 20):
     """
     获取采集任务列表
 
@@ -299,7 +299,7 @@ async def list_collect_tasks(
             ragflow_synced_count=t.get("ragflow_synced_count", 0),
             results=t.get("results", {}),
             error_msg=t.get("error_msg"),
-            completed_at=t.get("completed_at")
+            completed_at=t.get("completed_at"),
         )
         for t in tasks
     ]
@@ -311,7 +311,7 @@ async def list_reference_articles(
     keyword: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     获取已采集的参考文章列表
@@ -329,14 +329,11 @@ async def list_reference_articles(
     total = query.count()
 
     # 分页
-    articles = query.order_by(ReferenceArticle.collected_at.desc()).offset(
-        (page - 1) * page_size
-    ).limit(page_size).all()
-
-    return ReferenceArticleListResponse(
-        total=total,
-        items=articles
+    articles = (
+        query.order_by(ReferenceArticle.collected_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     )
+
+    return ReferenceArticleListResponse(total=total, items=articles)
 
 
 @router.get("/articles/{article_id}", response_model=ReferenceArticleResponse)
@@ -344,9 +341,7 @@ async def get_reference_article(article_id: int, db: Session = Depends(get_db)):
     """
     获取参考文章详情
     """
-    article = db.query(ReferenceArticle).filter(
-        ReferenceArticle.id == article_id
-    ).first()
+    article = db.query(ReferenceArticle).filter(ReferenceArticle.id == article_id).first()
 
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
@@ -361,9 +356,7 @@ async def get_reference_article_content(article_id: int, db: Session = Depends(g
 
     返回文章的完整正文内容。
     """
-    article = db.query(ReferenceArticle).filter(
-        ReferenceArticle.id == article_id
-    ).first()
+    article = db.query(ReferenceArticle).filter(ReferenceArticle.id == article_id).first()
 
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
@@ -373,7 +366,7 @@ async def get_reference_article_content(article_id: int, db: Session = Depends(g
         "title": article.title,
         "content": article.content,
         "url": article.url,
-        "platform": article.platform
+        "platform": article.platform,
     }
 
 
@@ -382,9 +375,7 @@ async def delete_reference_article(article_id: int, db: Session = Depends(get_db
     """
     删除参考文章（软删除）
     """
-    article = db.query(ReferenceArticle).filter(
-        ReferenceArticle.id == article_id
-    ).first()
+    article = db.query(ReferenceArticle).filter(ReferenceArticle.id == article_id).first()
 
     if not article:
         raise HTTPException(status_code=404, detail="文章不存在")
@@ -407,17 +398,14 @@ async def check_duplicate(request: DuplicateCheckRequest, db: Session = Depends(
     注意：需要配置 RAGFlow 才能使用此功能。
     """
     service = ArticleCollectorService(db=db)
-    result = await service.check_duplicate(
-        content=request.content,
-        threshold=request.threshold
-    )
+    result = await service.check_duplicate(content=request.content, threshold=request.threshold)
 
     return DuplicateCheckResponse(
         checked=result.get("checked", False),
         is_duplicate=result.get("is_duplicate", False),
         threshold=result.get("threshold", request.threshold),
         similar_articles=result.get("similar_articles", []),
-        error_msg=result.get("error_msg")
+        error_msg=result.get("error_msg"),
     )
 
 
@@ -428,15 +416,7 @@ async def get_supported_platforms():
     """
     return {
         "platforms": [
-            {
-                "id": "zhihu",
-                "name": "知乎",
-                "description": "知乎热门文章和回答"
-            },
-            {
-                "id": "toutiao",
-                "name": "今日头条",
-                "description": "今日头条热门资讯"
-            }
+            {"id": "zhihu", "name": "知乎", "description": "知乎热门文章和回答"},
+            {"id": "toutiao", "name": "今日头条", "description": "今日头条热门资讯"},
         ]
     }

@@ -50,8 +50,8 @@ class CryptoService:
             return ""
         try:
             # Fernet.encrypt 直接返回的就是 URL-Safe Base64 格式的 bytes
-            encrypted_bytes = self._fernet.encrypt(data.encode('utf-8'))
-            return encrypted_bytes.decode('utf-8')
+            encrypted_bytes = self._fernet.encrypt(data.encode("utf-8"))
+            return encrypted_bytes.decode("utf-8")
         except Exception as e:
             logger.error(f"❌ 加密失败: {e}")
             return ""
@@ -63,8 +63,8 @@ class CryptoService:
         if not encrypted_str:
             return ""
         try:
-            decrypted_bytes = self._fernet.decrypt(encrypted_str.encode('utf-8'))
-            return decrypted_bytes.decode('utf-8')
+            decrypted_bytes = self._fernet.decrypt(encrypted_str.encode("utf-8"))
+            return decrypted_bytes.decode("utf-8")
         except Exception:
             # 这种情况通常发生在密钥被修改后尝试解密旧数据
             logger.warning("⚠️ 解密失败：可能是密钥不匹配或数据损坏")

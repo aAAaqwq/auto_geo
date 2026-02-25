@@ -19,6 +19,7 @@ from backend.config import N8N_CALLBACK_URL
 
 # ==================== 配置 ====================
 
+
 class N8nConfig:
     # 🌟 优先读取环境变量，适配 Docker/生产环境
     # 格式示例：http://n8n:5678/webhook 或 http://192.168.1.10:5678/webhook
@@ -36,6 +37,7 @@ class N8nConfig:
 
 
 # ==================== 请求模型 (保持不变) ====================
+
 
 class KeywordDistillRequest(BaseModel):
     keywords: Optional[List[str]] = None
@@ -70,8 +72,10 @@ class IndexCheckAnalysisRequest(BaseModel):
 
 # ==================== 响应模型 ====================
 
+
 class N8nResponse(BaseModel):
     """n8n 统一响应格式"""
+
     status: Literal["success", "error", "processing"]
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -81,6 +85,7 @@ class N8nResponse(BaseModel):
 
 
 # ==================== 服务类 ====================
+
 
 class N8nService:
     """
@@ -102,8 +107,8 @@ class N8nService:
                 follow_redirects=True,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Content-Type": "application/json"
-                }
+                    "Content-Type": "application/json",
+                },
             )
         return self._client
 
@@ -113,10 +118,7 @@ class N8nService:
             await self._client.aclose()
 
     async def _call_webhook(
-            self,
-            endpoint: str,
-            payload: Dict[str, Any],
-            timeout: Optional[float] = None
+        self, endpoint: str, payload: Dict[str, Any], timeout: Optional[float] = None
     ) -> N8nResponse:
         """底层统一调用逻辑"""
         # 确保 endpoint 格式正确
@@ -170,9 +172,14 @@ class N8nService:
                     return N8nResponse(status="error", error=f"JSON解析失败: {raw_text[:100]}")
 
             except httpx.TimeoutException:
-                self.log.warning(f"⏳ n8n Webhook 请求超时 (尝试 {attempt + 1}/{self.config.MAX_RETRIES + 1})，当前设置等待时间为 {timeout_val}s，请检查 AI 模型响应速度")
+                self.log.warning(
+                    f"⏳ n8n Webhook 请求超时 (尝试 {attempt + 1}/{self.config.MAX_RETRIES + 1})，当前设置等待时间为 {timeout_val}s，请检查 AI 模型响应速度"
+                )
                 if attempt == self.config.MAX_RETRIES:
-                    return N8nResponse(status="error", error=f"AI 生成超时 (超时设置: {timeout_val}s)，请检查 n8n 资源占用或 AI 模型响应速度")
+                    return N8nResponse(
+                        status="error",
+                        error=f"AI 生成超时 (超时设置: {timeout_val}s)，请检查 n8n 资源占用或 AI 模型响应速度",
+                    )
 
             except Exception as e:
                 self.log.error(f"🚨 传输层异常: {str(e)}")
@@ -183,14 +190,14 @@ class N8nService:
     # ==================== 业务方法 (保持不变) ====================
 
     async def distill_keywords(
-            self,
-            *,
-            core_kw: Optional[str] = None,
-            target_info: Optional[str] = None,
-            prefixes: Optional[str] = None,
-            suffixes: Optional[str] = None,
-            keywords: Optional[List[str]] = None,
-            project_id: Optional[int] = None
+        self,
+        *,
+        core_kw: Optional[str] = None,
+        target_info: Optional[str] = None,
+        prefixes: Optional[str] = None,
+        suffixes: Optional[str] = None,
+        keywords: Optional[List[str]] = None,
+        project_id: Optional[int] = None,
     ) -> N8nResponse:
         self.log.info("🧹 正在蒸馏提纯关键词...")
         payload = KeywordDistillRequest(
@@ -209,12 +216,12 @@ class N8nService:
         return await self._call_webhook("generate-questions", payload)
 
     async def generate_geo_article(
-            self,
-            keyword: str,
-            requirements: str = "",
-            word_count: int = 1200,
-            callback_url: Optional[str] = None,
-            article_id: Optional[int] = None
+        self,
+        keyword: str,
+        requirements: str = "",
+        word_count: int = 1200,
+        callback_url: Optional[str] = None,
+        article_id: Optional[int] = None,
     ) -> N8nResponse:
         """
         异步生成GEO文章
@@ -229,18 +236,18 @@ class N8nService:
             requirements=requirements,
             word_count=word_count,
             callback_url=final_callback_url,
-            article_id=article_id
+            article_id=article_id,
         ).model_dump(exclude_none=True)
         # 使用短超时（触发成功即可），生成结果通过回调返回
         return await self._call_webhook("geo-article-generate", payload, timeout=self.config.TIMEOUT_SHORT)
 
     async def analyze_index_check(
-            self,
-            keyword: str,
-            doubao_indexed: bool,
-            qianwen_indexed: bool,
-            deepseek_indexed: bool,
-            history: Optional[List[Dict]] = None
+        self,
+        keyword: str,
+        doubao_indexed: bool,
+        qianwen_indexed: bool,
+        deepseek_indexed: bool,
+        history: Optional[List[Dict]] = None,
     ) -> N8nResponse:
         self.log.info("📊 正在请求 AI 深度分析收录趋势...")
         payload = IndexCheckAnalysisRequest(
@@ -248,7 +255,7 @@ class N8nService:
             doubao_indexed=doubao_indexed,
             qianwen_indexed=qianwen_indexed,
             deepseek_indexed=deepseek_indexed,
-            history=history or []
+            history=history or [],
         ).model_dump()
         return await self._call_webhook("index-check-analysis", payload)
 

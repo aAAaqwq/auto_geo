@@ -24,6 +24,7 @@ router = APIRouter(
 
 from pydantic import BaseModel
 
+
 class AuthStartFlowRequest(BaseModel):
     user_id: int
     project_id: int
@@ -31,17 +32,14 @@ class AuthStartFlowRequest(BaseModel):
 
 
 @router.post("/start-flow")
-async def start_auth_flow(
-    request: Request,
-    db: Session = Depends(get_db)
-):
+async def start_auth_flow(request: Request, db: Session = Depends(get_db)):
     """
     开始授权流程
-    
+
     Args:
         request: Request对象
         db: 数据库会话
-        
+
     Returns:
         授权流程信息
     """
@@ -57,38 +55,34 @@ async def start_auth_flow(
         user_id = body.get("user_id")
         project_id = body.get("project_id")
         platforms = body.get("platforms")
-        
+
         # 兼容性处理：如果前端传了 None，默认设为 1
         if user_id is None:
             user_id = 1
             logger.warning("user_id 为空，使用默认值 1")
-            
+
         if project_id is None:
             project_id = 1
             logger.warning("project_id 为空，使用默认值 1")
 
         # 简单的参数校验
         if user_id is None or project_id is None:
-             error_msg = f"缺少 user_id 或 project_id. 收到数据: {body}"
-             logger.error(error_msg)
-             raise HTTPException(status_code=400, detail=error_msg)
-        
+            error_msg = f"缺少 user_id 或 project_id. 收到数据: {body}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=400, detail=error_msg)
+
         if not platforms or not isinstance(platforms, list):
-             raise HTTPException(status_code=400, detail="platforms 必须是非空列表")
+            raise HTTPException(status_code=400, detail="platforms 必须是非空列表")
 
         # 宽松验证：如果用户不存在，创建默认用户
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             # 创建默认用户
-            user = User(
-                id=user_id,
-                username=f"user_{user_id}",
-                email=f"user_{user_id}@example.com"
-            )
+            user = User(id=user_id, username=f"user_{user_id}", email=f"user_{user_id}@example.com")
             db.add(user)
             db.commit()
             db.refresh(user)
-        
+
         # 宽松验证：如果项目不存在，创建默认项目
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
@@ -96,11 +90,7 @@ async def start_auth_flow(
             try:
                 # 创建默认项目
                 # 注意：Project 模型不需要 user_id
-                project = Project(
-                    id=project_id,
-                    name=f"默认项目_{project_id}",
-                    company_name=f"默认公司_{project_id}"
-                )
+                project = Project(id=project_id, name=f"默认项目_{project_id}", company_name=f"默认公司_{project_id}")
                 db.add(project)
                 db.commit()
                 db.refresh(project)
@@ -111,23 +101,19 @@ async def start_auth_flow(
                 if isinstance(e, TypeError):
                     logger.error(f"TypeError 详情: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"创建默认项目失败: {str(e)}")
-        
+
         # 开始授权流程
-        result = await auth_service.start_auth_flow(
-            user_id=user_id,
-            project_id=project_id,
-            platforms=platforms
-        )
-        
+        result = await auth_service.start_auth_flow(user_id=user_id, project_id=project_id, platforms=platforms)
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=400,
                 detail=result.get("error", "开始授权流程失败"),
-                headers={"X-Error-Code": result.get("error_code", "UNKNOWN_ERROR")}
+                headers={"X-Error-Code": result.get("error_code", "UNKNOWN_ERROR")},
             )
-        
+
         return JSONResponse(content=result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -138,25 +124,25 @@ async def start_auth_flow(
 async def get_auth_status(auth_session_id: str):
     """
     获取授权状态
-    
+
     Args:
         auth_session_id: 授权会话ID
-        
+
     Returns:
         授权状态
     """
     try:
         result = await auth_service.get_auth_status(auth_session_id)
-        
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=404,
                 detail=result.get("error", "授权会话不存在"),
-                headers={"X-Error-Code": result.get("error_code", "SESSION_NOT_FOUND")}
+                headers={"X-Error-Code": result.get("error_code", "SESSION_NOT_FOUND")},
             )
-        
+
         return JSONResponse(content=result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -164,35 +150,29 @@ async def get_auth_status(auth_session_id: str):
 
 
 @router.post("/start-platform/{auth_session_id}")
-async def start_platform_auth(
-    auth_session_id: str,
-    platform: str = Query(..., description="平台标识")
-):
+async def start_platform_auth(auth_session_id: str, platform: str = Query(..., description="平台标识")):
     """
     开始单个平台的授权
-    
+
     Args:
         auth_session_id: 授权会话ID
         platform: 平台标识
-        
+
     Returns:
         授权URL和状态
     """
     try:
-        result = await auth_service.start_platform_auth(
-            auth_session_id=auth_session_id,
-            platform=platform
-        )
-        
+        result = await auth_service.start_platform_auth(auth_session_id=auth_session_id, platform=platform)
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=400,
                 detail=result.get("error", "开始平台授权失败"),
-                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")},
             )
-        
+
         return JSONResponse(content=result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -200,35 +180,29 @@ async def start_platform_auth(
 
 
 @router.post("/complete-platform/{auth_session_id}")
-async def complete_platform_auth(
-    auth_session_id: str,
-    platform: str = Query(..., description="平台标识")
-):
+async def complete_platform_auth(auth_session_id: str, platform: str = Query(..., description="平台标识")):
     """
     完成平台授权
-    
+
     Args:
         auth_session_id: 授权会话ID
         platform: 平台标识
-        
+
     Returns:
         授权结果
     """
     try:
-        result = await auth_service.complete_platform_auth(
-            auth_session_id=auth_session_id,
-            platform=platform
-        )
-        
+        result = await auth_service.complete_platform_auth(auth_session_id=auth_session_id, platform=platform)
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=400,
                 detail=result.get("error", "完成平台授权失败"),
-                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")},
             )
-        
+
         return JSONResponse(content=result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -239,25 +213,25 @@ async def complete_platform_auth(
 async def cancel_auth_flow(auth_session_id: str):
     """
     取消授权流程
-    
+
     Args:
         auth_session_id: 授权会话ID
-        
+
     Returns:
         取消结果
     """
     try:
         result = await auth_service.cancel_auth_flow(auth_session_id)
-        
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=400,
                 detail=result.get("error", "取消授权流程失败"),
-                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")}
+                headers={"X-Error-Code": result.get("error_code", "INTERNAL_ERROR")},
             )
-        
+
         return JSONResponse(content=result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -266,30 +240,23 @@ async def cancel_auth_flow(auth_session_id: str):
 
 @router.get("/sessions")
 async def list_sessions(
-    user_id: int = Query(..., description="用户ID"),
-    project_id: int = Query(None, description="项目ID")
+    user_id: int = Query(..., description="用户ID"), project_id: int = Query(None, description="项目ID")
 ):
     """
     列出用户/项目的所有会话
-    
+
     Args:
         user_id: 用户ID
         project_id: 项目ID（可选）
-        
+
     Returns:
         会话列表
     """
     try:
-        result = await secure_session_manager.list_sessions(
-            user_id=user_id,
-            project_id=project_id
-        )
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": result
-        })
-        
+        result = await secure_session_manager.list_sessions(user_id=user_id, project_id=project_id)
+
+        return JSONResponse(content={"success": True, "data": result})
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
@@ -299,39 +266,32 @@ async def get_session_status(
     user_id: int = Query(..., description="用户ID"),
     project_id: int = Query(..., description="项目ID"),
     platform: str = Query(..., description="平台标识"),
-    fast: bool = Query(False, description="是否快速检查（仅检查文件存在性）")
+    fast: bool = Query(False, description="是否快速检查（仅检查文件存在性）"),
 ):
     """
     获取单个平台的会话状态
-    
+
     Args:
         user_id: 用户ID
         project_id: 项目ID
         platform: 平台标识
         fast: 是否快速检查
-        
+
     Returns:
         会话状态详情
     """
     try:
         if fast:
             result = await secure_session_manager.get_session_status_fast(
-                user_id=user_id,
-                project_id=project_id,
-                platform=platform
+                user_id=user_id, project_id=project_id, platform=platform
             )
         else:
             result = await secure_session_manager.get_session_status(
-                user_id=user_id,
-                project_id=project_id,
-                platform=platform
+                user_id=user_id, project_id=project_id, platform=platform
             )
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": result
-        })
-        
+
+        return JSONResponse(content={"success": True, "data": result})
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
@@ -340,34 +300,27 @@ async def get_session_status(
 async def delete_session(
     user_id: int = Body(..., description="用户ID"),
     project_id: int = Body(..., description="项目ID"),
-    platform: str = Body(..., description="平台标识")
+    platform: str = Body(..., description="平台标识"),
 ):
     """
     删除会话
-    
+
     Args:
         user_id: 用户ID
         project_id: 项目ID
         platform: 平台标识
-        
+
     Returns:
         删除结果
     """
     try:
-        result = await secure_session_manager.delete_session(
-            user_id=user_id,
-            project_id=project_id,
-            platform=platform
-        )
-        
+        result = await secure_session_manager.delete_session(user_id=user_id, project_id=project_id, platform=platform)
+
         if not result:
             raise HTTPException(status_code=400, detail="删除会话失败")
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "会话删除成功"
-        })
-        
+
+        return JSONResponse(content={"success": True, "message": "会话删除成功"})
+
     except HTTPException:
         raise
     except Exception as e:
@@ -378,17 +331,14 @@ async def delete_session(
 async def cleanup_auth_sessions():
     """
     清理过期的授权会话
-    
+
     Returns:
         清理结果
     """
     try:
         await auth_service.cleanup_expired_sessions()
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "过期会话清理完成"
-        })
-        
+
+        return JSONResponse(content={"success": True, "message": "过期会话清理完成"})
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")

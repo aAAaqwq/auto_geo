@@ -111,7 +111,7 @@ class SohuPublisher(BasePublisher):
     def _extract_keyword(self, title: str) -> str:
         """从标题中提取关键词用于生成相关图片"""
         # 移除标点和特殊字符，提取核心词
-        cleaned = re.sub(r'[^\w\u4e00-\u9fff]', ' ', title)
+        cleaned = re.sub(r"[^\w\u4e00-\u9fff]", " ", title)
         words = cleaned.split()
         # 返回前 1-2 个核心词
         if words:
@@ -120,7 +120,7 @@ class SohuPublisher(BasePublisher):
 
     def _split_content_to_chunks(self, content: str, num_chunks: int = 4) -> List[str]:
         """将内容按换行符切成指定数量的块"""
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
         if not lines:
             return [""] * num_chunks
 
@@ -130,7 +130,7 @@ class SohuPublisher(BasePublisher):
             start = i * chunk_size
             end = (i + 1) * chunk_size if i < num_chunks - 1 else len(lines)
             chunk_lines = lines[start:end]
-            chunks.append('\n'.join(chunk_lines))
+            chunks.append("\n".join(chunk_lines))
         return chunks
 
     async def _download_relevant_images(self, keyword: str, count: int = 4) -> List[str]:
@@ -255,6 +255,7 @@ class SohuPublisher(BasePublisher):
 
             if not file_set:
                 logger.warning("⚠️ [步骤2] 文件输入失败，尝试兜底方案...")
+
                 # 兜底：使用 filechooser
                 async def handle_file_chooser(file_chooser):
                     await file_chooser.set_files(file_path)
@@ -265,10 +266,10 @@ class SohuPublisher(BasePublisher):
                     try:
                         upload_input = page.locator(selector).first
                         if await upload_input.count() > 0:
-                            page.on('filechooser', handle_file_chooser)
+                            page.on("filechooser", handle_file_chooser)
                             await upload_input.click(force=True)
                             await asyncio.sleep(1)
-                            page.remove_listener('filechooser', handle_file_chooser)
+                            page.remove_listener("filechooser", handle_file_chooser)
                             file_set = True
                             break
                     except:
@@ -329,8 +330,8 @@ class SohuPublisher(BasePublisher):
             logger.info("🎯 [封面-步骤1] 点击封面上传图标...")
 
             icon_selectors = [
-                'i.iconfont.mp-icon-upload',
-                '.upload-file i.iconfont',
+                "i.iconfont.mp-icon-upload",
+                ".upload-file i.iconfont",
                 'i[class*="iconfont"][class*="upload"]',
             ]
 
@@ -350,8 +351,8 @@ class SohuPublisher(BasePublisher):
                 logger.warning("⚠️ [封面-步骤1] 未找到上传图标，尝试点击封面区域...")
                 # 兜底：直接点击封面区域
                 cover_selectors = [
-                    'div.upload-file.mp-upload',
-                    '.upload-file',
+                    "div.upload-file.mp-upload",
+                    ".upload-file",
                 ]
                 for selector in cover_selectors:
                     try:
@@ -409,7 +410,7 @@ class SohuPublisher(BasePublisher):
                 return { success: false, reason: 'no_success_indicator' };
             }""")
 
-            if preview_check.get('success'):
+            if preview_check.get("success"):
                 logger.info(f"✅ [封面-步骤3] 封面上传成功 ({preview_check.get('reason')})")
             else:
                 logger.warning(f"⚠️ [封面-步骤3] 未检测到封面上传成功标识 ({preview_check.get('reason')})，但继续流程")
@@ -451,7 +452,8 @@ class SohuPublisher(BasePublisher):
             # 4. 【核心黑科技】通过 DataTransfer 模拟粘贴事件
             # 这能绕过 Vue 的拦截，直接将内容塞入 Quill 的内部状态
             logger.info("📋 通过 DataTransfer 模拟粘贴事件...")
-            await page.evaluate('''(text) => {
+            await page.evaluate(
+                """(text) => {
                 const el = document.querySelector(".ql-editor");
                 const dt = new DataTransfer();
                 dt.setData("text/plain", text);
@@ -461,7 +463,9 @@ class SohuPublisher(BasePublisher):
                     cancelable: true
                 });
                 el.dispatchEvent(pasteEvent);
-            }''', full_text)
+            }""",
+                full_text,
+            )
 
             # 5. 【唤醒状态】物理按键组合拳
             # 在粘贴后按一下 End，再按两下空格，再退格
@@ -520,7 +524,7 @@ class SohuPublisher(BasePublisher):
             # 尝试多种选择器定位"发布内容"按钮
             publish_selectors = [
                 'button:has-text("发布内容")',
-                '.publish-btn',
+                ".publish-btn",
                 'span:has-text("发布内容")',
                 'a:has-text("发布内容")',
                 '[class*="publish"]:has-text("发布")',
@@ -629,11 +633,7 @@ class SohuPublisher(BasePublisher):
                                 continue
 
                         logger.info("✅ 发布成功")
-                        return {
-                            "success": True,
-                            "platform_url": page.url,
-                            "error_msg": None
-                        }
+                        return {"success": True, "platform_url": page.url, "error_msg": None}
                 except Exception as e:
                     logger.error(f"使用选择器 {selector} 点击发布失败: {e}")
                     continue
@@ -646,15 +646,21 @@ class SohuPublisher(BasePublisher):
 
     def _deep_clean_content(self, text: str) -> str:
         """清理正文内容"""
-        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-        text = re.sub(r'#+\s*', '', text)
-        text = re.sub(r'\*\*+', '', text)
+        text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+        text = re.sub(r"#+\s*", "", text)
+        text = re.sub(r"\*\*+", "", text)
         return text.strip()
 
 
 # 注册
-registry.register("sohu", SohuPublisher("sohu", {
-    "name": "搜狐号",
-    "publish_url": "https://mp.sohu.com/mpfe/v4/contentManagement/firstpage",
-    "color": "#F85959"
-}))
+registry.register(
+    "sohu",
+    SohuPublisher(
+        "sohu",
+        {
+            "name": "搜狐号",
+            "publish_url": "https://mp.sohu.com/mpfe/v4/contentManagement/firstpage",
+            "color": "#F85959",
+        },
+    ),
+)

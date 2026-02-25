@@ -7,6 +7,7 @@
 import sys
 import subprocess
 
+
 def kill_port(port: int):
     """
     强制释放指定端口
@@ -15,18 +16,12 @@ def kill_port(port: int):
 
     try:
         # Windows: 使用 netstat 查找占用端口的进程
-        result = subprocess.run(
-            ['netstat', '-ano'],
-            capture_output=True,
-            text=True,
-            encoding='gbk',
-            errors='ignore'
-        )
+        result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, encoding="gbk", errors="ignore")
 
         # 查找占用该端口的进程
         pids = set()
-        for line in result.stdout.split('\n'):
-            if f':{port}' in line and 'LISTENING' in line:
+        for line in result.stdout.split("\n"):
+            if f":{port}" in line and "LISTENING" in line:
                 parts = line.split()
                 if len(parts) >= 5:
                     pid = parts[-1]
@@ -43,11 +38,7 @@ def kill_port(port: int):
         for pid in pids:
             try:
                 subprocess.run(
-                    ['taskkill', '/F', '/PID', pid],
-                    capture_output=True,
-                    text=True,
-                    encoding='gbk',
-                    errors='ignore'
+                    ["taskkill", "/F", "/PID", pid], capture_output=True, text=True, encoding="gbk", errors="ignore"
                 )
                 print(f"  ✓ 已终止进程 {pid}")
             except Exception as e:

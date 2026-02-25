@@ -3,6 +3,7 @@ from typing import Dict
 from fastapi import WebSocket
 from loguru import logger
 
+
 class ConnectionManager:
     def __init__(self):
         # 存储活跃的连接 {client_id: WebSocket}
@@ -36,6 +37,7 @@ class ConnectionManager:
             except Exception:
                 # 忽略已经失效的连接
                 pass
+
 
 # 创建全局单例
 ws_manager = ConnectionManager()

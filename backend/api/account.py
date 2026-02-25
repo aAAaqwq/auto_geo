@@ -11,9 +11,15 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.database.models import Account
 from backend.schemas import (
-    AccountCreate, AccountUpdate, AccountResponse, AccountDetailResponse,
-    AuthStartRequest, AuthStartResponse, AuthStatusResponse,
-    ApiResponse, AccountCheckSummary
+    AccountCreate,
+    AccountUpdate,
+    AccountResponse,
+    AccountDetailResponse,
+    AuthStartRequest,
+    AuthStartResponse,
+    AuthStatusResponse,
+    ApiResponse,
+    AccountCheckSummary,
 )
 from backend.config import PLATFORMS
 from backend.services.playwright_mgr import playwright_mgr
@@ -35,11 +41,14 @@ def set_ws_manager(manager):
 
 # 设置 playwright_mgr 的数据库工厂
 playwright_mgr.set_db_factory(get_db)
+
+
 # 设置 playwright_mgr 的 WebSocket 回调
 async def ws_notification(data: dict):
     """通过 WebSocket 发送通知"""
     if ws_manager:
         await ws_manager.broadcast(data)
+
 
 playwright_mgr.set_ws_callback(ws_notification)
 
@@ -48,7 +57,7 @@ playwright_mgr.set_ws_callback(ws_notification)
 async def get_accounts(
     platform: str = Query(None, description="平台筛选"),
     status: int = Query(None, description="状态筛选"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     获取账号列表
@@ -85,7 +94,7 @@ async def get_account(account_id: int, db: Session = Depends(get_db)):
         updated_at=account.updated_at,
         remark=account.remark,
         is_authorized=bool(account.cookies and account.storage_state),
-        platform_info=PLATFORMS.get(account.platform)
+        platform_info=PLATFORMS.get(account.platform),
     )
 
     return response
@@ -107,7 +116,7 @@ async def create_account(account_data: AccountCreate, db: Session = Depends(get_
         platform=account_data.platform,
         account_name=account_data.account_name,
         remark=account_data.remark,
-        status=0  # 初始状态为禁用，授权后激活
+        status=0,  # 初始状态为禁用，授权后激活
     )
     db.add(account)
     db.commit()
@@ -118,11 +127,7 @@ async def create_account(account_data: AccountCreate, db: Session = Depends(get_
 
 
 @router.put("/{account_id}", response_model=AccountResponse)
-async def update_account(
-    account_id: int,
-    account_data: AccountUpdate,
-    db: Session = Depends(get_db)
-):
+async def update_account(account_id: int, account_data: AccountUpdate, db: Session = Depends(get_db)):
     """更新账号信息"""
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
@@ -163,6 +168,7 @@ async def delete_account(account_id: int, db: Session = Depends(get_db)):
 
 # ==================== 授权相关 ====================
 
+
 @router.post("/auth/start", response_model=AuthStartResponse)
 async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db)):
     """
@@ -186,18 +192,14 @@ async def start_auth(auth_data: AuthStartRequest, db: Session = Depends(get_db))
 
     # 创建授权任务
     try:
-        task = await playwright_mgr.create_auth_task(
-            platform,
-            auth_data.account_id,
-            auth_data.account_name
-        )
+        task = await playwright_mgr.create_auth_task(platform, auth_data.account_id, auth_data.account_name)
         logger.info(f"授权任务已启动: {task.task_id}, 平台: {platform}")
         return AuthStartResponse(
-            task_id=task.task_id,
-            message=f"已打开{PLATFORMS[platform]['name']}登录页面，请完成扫码/密码登录"
+            task_id=task.task_id, message=f"已打开{PLATFORMS[platform]['name']}登录页面，请完成扫码/密码登录"
         )
     except Exception as e:
         import traceback
+
         logger.error(f"启动授权任务失败: {repr(e)}")
         logger.error(f"堆栈跟踪:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"启动授权失败: {repr(e)}")
@@ -218,10 +220,7 @@ async def get_auth_status(task_id: str, db: Session = Depends(get_db)):
     account_id = task.account_id or task.created_account_id
 
     response = AuthStatusResponse(
-        task_id=task.task_id,
-        status=task.status,
-        is_logged_in=(task.status == "success"),
-        account_id=account_id
+        task_id=task.task_id, status=task.status, is_logged_in=(task.status == "success"), account_id=account_id
     )
 
     # 设置消息
@@ -286,23 +285,23 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
         return ApiResponse(success=False, message="授权任务已失效，请重新开始授权")
 
     cookies = await task.context.cookies()
-    storage_state = await task.page.evaluate("""
+    storage_state = (
+        await task.page.evaluate("""
         () => {
             return {
                 localStorage: {...localStorage},
                 sessionStorage: {...sessionStorage}
             };
         }
-    """) or {}
+    """)
+        or {}
+    )
 
     # 验证是否真的登录了（简单检查：是否有有效cookie）
     if not cookies or len(cookies) < 3:
         logger.warning(f"Cookie验证失败: cookie数量={len(cookies) if cookies else 0}")
         logger.info(f"当前Cookie列表: {[c['name'] for c in cookies] if cookies else []}")
-        return ApiResponse(
-            success=False,
-            message="未检测到登录信息，请先在平台完成登录后再点击授权完成"
-        )
+        return ApiResponse(success=False, message="未检测到登录信息，请先在平台完成登录后再点击授权完成")
 
     # 保存到数据库
     try:
@@ -328,7 +327,7 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
                 cookies=encrypt_cookies(cookies),
                 storage_state=encrypt_storage_state(storage_state),
                 status=1,
-                last_auth_time=task.created_at
+                last_auth_time=task.created_at,
             )
             db.add(account)
             db.commit()
@@ -345,13 +344,15 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
 
         # 通过 WebSocket 通知前端
         if ws_manager:
-            await ws_manager.broadcast({
-                "type": "auth_complete",
-                "task_id": task.task_id,
-                "platform": task.platform,
-                "account_id": task.account_id or task.created_account_id,
-                "success": True
-            })
+            await ws_manager.broadcast(
+                {
+                    "type": "auth_complete",
+                    "task_id": task.task_id,
+                    "platform": task.platform,
+                    "account_id": task.account_id or task.created_account_id,
+                    "success": True,
+                }
+            )
 
         return ApiResponse(
             success=True,
@@ -359,8 +360,8 @@ async def confirm_auth(task_id: str, db: Session = Depends(get_db)):
             data={
                 "account_id": task.account_id or task.created_account_id,
                 "platform": task.platform,
-                "task_id": task_id
-            }
+                "task_id": task_id,
+            },
         )
 
     except Exception as e:
@@ -378,6 +379,7 @@ async def cancel_auth(task_id: str):
 
 # ==================== 账号检测相关 ====================
 
+
 @router.post("/check/all", response_model=AccountCheckSummary)
 async def check_all_accounts(db: Session = Depends(get_db)):
     """
@@ -389,23 +391,19 @@ async def check_all_accounts(db: Session = Depends(get_db)):
     async def progress_callback(current: int, total: int, result: dict):
         """推送检测进度到前端"""
         if ws_manager:
-            await ws_manager.broadcast({
-                "type": "account_check_progress",
-                "current": current,
-                "total": total,
-                "progress": round(current / total * 100, 1),
-                "result": result
-            })
+            await ws_manager.broadcast(
+                {
+                    "type": "account_check_progress",
+                    "current": current,
+                    "total": total,
+                    "progress": round(current / total * 100, 1),
+                    "result": result,
+                }
+            )
 
-    summary = await account_validator.check_all_accounts(
-        db_session=db,
-        progress_callback=progress_callback
-    )
+    summary = await account_validator.check_all_accounts(db_session=db, progress_callback=progress_callback)
 
     if ws_manager:
-        await ws_manager.broadcast({
-            "type": "account_check_complete",
-            "summary": summary
-        })
+        await ws_manager.broadcast({"type": "account_check_complete", "summary": summary})
 
     return summary

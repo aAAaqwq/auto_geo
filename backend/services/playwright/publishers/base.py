@@ -117,11 +117,7 @@ class BasePublisher(ABC):
         # 默认实现：等待一段时间后检查URL是否变化
         await page.wait_for_timeout(3000)
 
-        result = {
-            "success": True,
-            "platform_url": page.url,
-            "error_msg": None
-        }
+        result = {"success": True, "platform_url": page.url, "error_msg": None}
 
         return result
 

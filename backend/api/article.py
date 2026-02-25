@@ -58,7 +58,7 @@ async def get_articles(
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     publish_status: Optional[str] = Query(None, description="发布状态筛选"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     获取文章列表（使用 GeoArticle 模型）
@@ -69,10 +69,7 @@ async def get_articles(
         query = query.filter(GeoArticle.publish_status == publish_status)
 
     if keyword:
-        query = query.filter(
-            (GeoArticle.title.contains(keyword)) |
-            (GeoArticle.content.contains(keyword))
-        )
+        query = query.filter((GeoArticle.title.contains(keyword)) | (GeoArticle.content.contains(keyword)))
 
     # 统计总数
     total = query.count()

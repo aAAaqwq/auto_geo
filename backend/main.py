@@ -15,10 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 # 导入配置和数据库
-from backend.config import (
-    APP_NAME, APP_VERSION, DEBUG, HOST, PORT, RELOAD,
-    CORS_ORIGINS, PLATFORMS
-)
+from backend.config import APP_NAME, APP_VERSION, DEBUG, HOST, PORT, RELOAD, CORS_ORIGINS, PLATFORMS
 from backend.database import init_db, SessionLocal
 from backend.scripts.fix_database import check_and_fix_database
 
@@ -75,8 +72,9 @@ def socket_log_sink(message):
 # 艹，修复 Windows GBK 编码下的 emoji 输出问题！
 # 强制重新配置 stdout 使用 UTF-8 编码
 import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # 配置 Loguru（stdout 已经是 UTF-8 了，不需要额外指定 encoding）
 logger.remove()
@@ -117,7 +115,9 @@ async def lifespan(app: FastAPI):
 
     # 5. 注册平台发布适配器
     register_publishers(PLATFORMS)
-    logger.bind(module="发布器").success(f"已注册 {len([k for k in PLATFORMS.keys() if k in ['zhihu', 'baijiahao', 'sohu', 'toutiao']])} 个平台发布器")
+    logger.bind(module="发布器").success(
+        f"已注册 {len([k for k in PLATFORMS.keys() if k in ['zhihu', 'baijiahao', 'sohu', 'toutiao']])} 个平台发布器"
+    )
 
     yield
 
@@ -172,8 +172,8 @@ app.include_router(reports.router)
 app.include_router(notifications.router)
 app.include_router(scheduler.router)
 app.include_router(knowledge.router)
-app.include_router(upload.router)       # 文件上传
-app.include_router(client.router)       # 客户管理
+app.include_router(upload.router)  # 文件上传
+app.include_router(client.router)  # 客户管理
 app.include_router(auth.router)
 app.include_router(article_collection.router)
 app.include_router(site_builder.router)
@@ -236,10 +236,4 @@ if __name__ == "__main__":
     logger.info(f"正在启动 {APP_NAME} v{APP_VERSION}...")
     logger.info(f"服务地址: http://{HOST}:{PORT}")
 
-    uvicorn.run(
-        app,
-        host=HOST,
-        port=PORT,
-        reload=RELOAD,
-        log_level="info"
-    )
+    uvicorn.run(app, host=HOST, port=PORT, reload=RELOAD, log_level="info")

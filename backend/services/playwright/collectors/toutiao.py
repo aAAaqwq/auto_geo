@@ -26,7 +26,7 @@ class ToutiaoCollector(BaseCollector):
             # 使用更完整的搜索 URL，模拟真实请求
             search_url = f"https://so.toutiao.com/search?keyword={keyword}&enable_druid_v2=1&dvpf=pc&source=search_subtab_switch&pd=information&action_type=search_subtab_switch&page_num=0&search_id=&from=news&cur_tab_title=news"
             await page.goto(search_url, wait_until="networkidle")
-            
+
             # 增加延时，等待页面加载和可能的弹窗
             await self._random_sleep(3, 5)
 
@@ -81,14 +81,16 @@ class ToutiaoCollector(BaseCollector):
                         author = await author_elem.text_content()
 
                     if title and href:
-                        articles.append({
-                            "title": title.strip(),
-                            "url": href,
-                            "likes": reads // 100,  # 估算点赞数
-                            "reads": reads,
-                            "comments": comments,
-                            "author": author.strip() if author else "",
-                        })
+                        articles.append(
+                            {
+                                "title": title.strip(),
+                                "url": href,
+                                "likes": reads // 100,  # 估算点赞数
+                                "reads": reads,
+                                "comments": comments,
+                                "author": author.strip() if author else "",
+                            }
+                        )
 
                 except Exception as e:
                     logger.debug(f"[头条] 提取单条结果失败: {e}")
@@ -104,13 +106,13 @@ class ToutiaoCollector(BaseCollector):
         try:
             logger.info(f"[头条] 正在提取文章: {url}")
             await page.goto(url, wait_until="domcontentloaded")
-            
+
             # 增加延时，等待页面加载
             await self._random_sleep(3, 5)
 
             # 检测登录弹窗
             await self._handle_login_popup(page)
-            
+
             # 尝试多种选择器
             selectors = [
                 "article",
@@ -123,7 +125,7 @@ class ToutiaoCollector(BaseCollector):
                 ".post-content",
                 # 针对不同版面的补充
                 "div[class*='article-content']",
-                "div[class*='text']"
+                "div[class*='text']",
             ]
 
             content = None
@@ -152,20 +154,21 @@ class ToutiaoCollector(BaseCollector):
                 try:
                     import os
                     from datetime import datetime
+
                     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                     debug_dir = "tests/reports/debug"
                     os.makedirs(debug_dir, exist_ok=True)
-                    
+
                     # 保存 HTML
                     html_path = f"{debug_dir}/toutiao_fail_{timestamp}.html"
                     html_content = await page.content()
                     with open(html_path, "w", encoding="utf-8") as f:
                         f.write(html_content)
-                    
+
                     # 保存截图
                     img_path = f"{debug_dir}/toutiao_fail_{timestamp}.png"
                     await page.screenshot(path=img_path)
-                    
+
                     logger.info(f"[头条] 已保存调试文件: {html_path}, {img_path}")
                 except Exception as e:
                     logger.error(f"[头条] 保存调试文件失败: {e}")
@@ -182,18 +185,18 @@ class ToutiaoCollector(BaseCollector):
             return 0
 
         text = text.strip().lower()
-        match = re.search(r'([\d.]+)\s*([kwm万])?', text)
+        match = re.search(r"([\d.]+)\s*([kwm万])?", text)
         if not match:
             return 0
 
         num = float(match.group(1))
         unit = match.group(2)
 
-        if unit in ['k', 'K']:
+        if unit in ["k", "K"]:
             num *= 1000
-        elif unit in ['w', 'W', '万']:
+        elif unit in ["w", "W", "万"]:
             num *= 10000
-        elif unit in ['m', 'M']:
+        elif unit in ["m", "M"]:
             num *= 1000000
 
         return int(num)

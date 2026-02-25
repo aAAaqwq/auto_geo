@@ -10,9 +10,4 @@ if __name__ == "__main__":
     import uvicorn
     from backend.config import HOST, PORT
 
-    uvicorn.run(
-        app,
-        host=HOST,
-        port=PORT,
-        log_level="info"
-    )
+    uvicorn.run(app, host=HOST, port=PORT, log_level="info")

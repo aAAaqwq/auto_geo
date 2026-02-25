@@ -28,7 +28,8 @@ class AccountValidator:
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
                 headless=True,  # 保持无头模式以提高性能
-                args=BROWSER_ARGS + [
+                args=BROWSER_ARGS
+                + [
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                     "--disable-background-networking",
@@ -36,8 +37,8 @@ class AccountValidator:
                     "--disable-infobars",
                     "--no-sandbox",
                     "--disable-web-security",  # 允许跨域，某些平台需要
-                    "--disable-features=IsolateOrigins,site-per-process"  # 共享进程上下文
-                ]
+                    "--disable-features=IsolateOrigins,site-per-process",  # 共享进程上下文
+                ],
             )
             logger.info("验证浏览器已启动")
 
@@ -106,8 +107,8 @@ class AccountValidator:
         # 定义明确的登录页标题模式
         login_title_patterns = [
             r"^登录\s*-\s*.*",  # 以"登录-"开头
-            r"^\s*登录\s*$",     # 仅有"登录"
-            r"^.*登录页$",       # 以"登录页"结尾
+            r"^\s*登录\s*$",  # 仅有"登录"
+            r"^.*登录页$",  # 以"登录页"结尾
             r"^Sign\s+in\s*-\s*.*",  # 英文登录
         ]
 
@@ -209,7 +210,7 @@ class AccountValidator:
             "status_before": account.status,
             "is_valid": False,
             "message": "",
-            "check_time": datetime.now().isoformat()
+            "check_time": datetime.now().isoformat(),
         }
 
         # 修复：删除重复的日志打印
@@ -251,8 +252,7 @@ class AccountValidator:
 
             # 创建上下文和页面
             context = await self._browser.new_context(
-                storage_state=storage_state,
-                viewport={"width": 1280, "height": 800}
+                storage_state=storage_state, viewport={"width": 1280, "height": 800}
             )
             page = await context.new_page()
 
@@ -346,6 +346,7 @@ class AccountValidator:
 
         except Exception as e:
             import traceback
+
             logger.error(f"检测账号 {account.account_name} 时发生错误: {e}")
             logger.error(f"错误堆栈:\n{traceback.format_exc()}")
             result["message"] = f"检测失败: {str(e)}"
@@ -360,11 +361,7 @@ class AccountValidator:
 
         return result
 
-    async def check_all_accounts(
-        self,
-        db_session: Any,
-        progress_callback: Optional[Callable] = None
-    ) -> Dict[str, Any]:
+    async def check_all_accounts(self, db_session: Any, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """批量检测所有账号的授权状态"""
         from backend.database.models import Account
 
@@ -374,13 +371,7 @@ class AccountValidator:
 
         if total == 0:
             logger.info("没有需要检测的账号")
-            return {
-                "total": 0,
-                "success": 0,
-                "failed": 0,
-                "results": [],
-                "check_time": datetime.now().isoformat()
-            }
+            return {"total": 0, "success": 0, "failed": 0, "results": [], "check_time": datetime.now().isoformat()}
 
         logger.info(f"开始批量检测 {total} 个账号的授权状态")
 
@@ -413,7 +404,7 @@ class AccountValidator:
             "success": success_count,
             "failed": failed_count,
             "results": results,
-            "check_time": datetime.now().isoformat()
+            "check_time": datetime.now().isoformat(),
         }
 
         logger.info(f"批量检测完成: 总计 {total}, 成功 {success_count}, 失败 {failed_count}")

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from loguru import logger
 
 from backend.database.models import Keyword, Project, QuestionVariant
+
 # 🌟 关键修改：引入新的 n8n 服务，替换旧的 client
 from backend.services.n8n_service import get_n8n_service
 
@@ -22,10 +23,7 @@ class KeywordService:
         添加单个关键词 (带查重逻辑)
         """
         # 1. 检查是否存在
-        exists = self.db.query(Keyword).filter(
-            Keyword.project_id == project_id,
-            Keyword.keyword == keyword
-        ).first()
+        exists = self.db.query(Keyword).filter(Keyword.project_id == project_id, Keyword.keyword == keyword).first()
 
         if exists:
             # 如果已存在但状态不是 active，则激活它
@@ -37,12 +35,7 @@ class KeywordService:
             return exists
 
         # 2. 创建新词
-        new_kw = Keyword(
-            project_id=project_id,
-            keyword=keyword,
-            difficulty_score=difficulty_score,
-            status="active"
-        )
+        new_kw = Keyword(project_id=project_id, keyword=keyword, difficulty_score=difficulty_score, status="active")
         self.db.add(new_kw)
         self.db.commit()
         self.db.refresh(new_kw)
@@ -52,34 +45,32 @@ class KeywordService:
     def add_question_variant(self, keyword_id: int, question: str) -> QuestionVariant:
         """添加问题变体"""
         # 简单查重
-        exists = self.db.query(QuestionVariant).filter(
-            QuestionVariant.keyword_id == keyword_id,
-            QuestionVariant.question == question
-        ).first()
+        exists = (
+            self.db.query(QuestionVariant)
+            .filter(QuestionVariant.keyword_id == keyword_id, QuestionVariant.question == question)
+            .first()
+        )
 
         if exists:
             return exists
 
-        new_qv = QuestionVariant(
-            keyword_id=keyword_id,
-            question=question
-        )
+        new_qv = QuestionVariant(keyword_id=keyword_id, question=question)
         self.db.add(new_qv)
         self.db.commit()
         self.db.refresh(new_qv)
         return new_qv
 
     async def distill(
-            self,
-            *,
-            core_kw: str,
-            target_info: str,
-            prefixes: str = "",
-            suffixes: str = "",
-            company_name: str = "",
-            industry: str = "",
-            description: str = "",
-            count: int = 10
+        self,
+        *,
+        core_kw: str,
+        target_info: str,
+        prefixes: str = "",
+        suffixes: str = "",
+        company_name: str = "",
+        industry: str = "",
+        description: str = "",
+        count: int = 10,
     ) -> Dict[str, Any]:
         """
         🌟 核心方法：执行关键词蒸馏 (调用 n8n)
@@ -101,7 +92,7 @@ class KeywordService:
                     target_info=target_info,
                     prefixes=prefixes or None,
                     suffixes=suffixes or None,
-                    project_id=None
+                    project_id=None,
                 )
             else:
                 result = await n8n.distill_keywords(keywords=legacy_keywords_list, project_id=None)
@@ -170,15 +161,10 @@ class KeywordService:
 
     # ==================== 基础 CRUD 方法 ====================
 
-    def create_project(self, name: str, company_name: str, description: Optional[str] = None,
-                       industry: Optional[str] = None) -> Project:
-        project = Project(
-            name=name,
-            company_name=company_name,
-            description=description,
-            industry=industry,
-            status=1
-        )
+    def create_project(
+        self, name: str, company_name: str, description: Optional[str] = None, industry: Optional[str] = None
+    ) -> Project:
+        project = Project(name=name, company_name=company_name, description=description, industry=industry, status=1)
         self.db.add(project)
         self.db.commit()
         self.db.refresh(project)
@@ -186,14 +172,10 @@ class KeywordService:
 
     def get_project_keywords(self, project_id: int) -> List[Keyword]:
         """获取项目关键词 (包含软删除的，以便查看历史)"""
-        return self.db.query(Keyword).filter(
-            Keyword.project_id == project_id
-        ).all()
+        return self.db.query(Keyword).filter(Keyword.project_id == project_id).all()
 
     def get_keyword_questions(self, keyword_id: int) -> List[QuestionVariant]:
-        return self.db.query(QuestionVariant).filter(
-            QuestionVariant.keyword_id == keyword_id
-        ).all()
+        return self.db.query(QuestionVariant).filter(QuestionVariant.keyword_id == keyword_id).all()
 
     def list_projects(self) -> List[Project]:
         return self.db.query(Project).filter(Project.status == 1).all()

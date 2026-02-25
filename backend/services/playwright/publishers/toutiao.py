@@ -135,7 +135,7 @@ class ToutiaoPublisher(BasePublisher):
     def _extract_keyword(self, title: str) -> str:
         """从标题中提取关键词用于生成相关图片"""
         # 移除标点和特殊字符，提取核心词
-        cleaned = re.sub(r'[^\w\u4e00-\u9fff]', ' ', title)
+        cleaned = re.sub(r"[^\w\u4e00-\u9fff]", " ", title)
         words = cleaned.split()
         # 返回前 1-2 个核心词
         if words:
@@ -144,7 +144,7 @@ class ToutiaoPublisher(BasePublisher):
 
     def _split_content_to_chunks(self, content: str, num_chunks: int = 4) -> List[str]:
         """将内容按换行符切成指定数量的块"""
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
         if not lines:
             return [""] * num_chunks
 
@@ -154,7 +154,7 @@ class ToutiaoPublisher(BasePublisher):
             start = i * chunk_size
             end = (i + 1) * chunk_size if i < num_chunks - 1 else len(lines)
             chunk_lines = lines[start:end]
-            chunks.append('\n'.join(chunk_lines))
+            chunks.append("\n".join(chunk_lines))
         return chunks
 
     async def _download_relevant_images(self, keyword: str, count: int = 3) -> List[str]:
@@ -178,7 +178,9 @@ class ToutiaoPublisher(BasePublisher):
                 if resp.status_code == 200:
                     # 保存到临时文件
                     suffix = "_fallback" if is_fallback else ""
-                    tmp = os.path.join(tempfile.gettempdir(), f"tt_v61_{keyword}_{random.randint(10000, 99999)}{suffix}.jpg")
+                    tmp = os.path.join(
+                        tempfile.gettempdir(), f"tt_v61_{keyword}_{random.randint(10000, 99999)}{suffix}.jpg"
+                    )
                     with open(tmp, "wb") as f:
                         f.write(resp.content)
 
@@ -228,7 +230,9 @@ class ToutiaoPublisher(BasePublisher):
                     logger.warning("⚠️ pollinations.ai 失败，切换到兜底图源 picsum.photos...")
                     # 重试 3 次
                     for retry in range(3):
-                        downloaded = await _download_single_image(f"{fallback_url}?random={random.randint(1, 100000)}", i, is_fallback=True)
+                        downloaded = await _download_single_image(
+                            f"{fallback_url}?random={random.randint(1, 100000)}", i, is_fallback=True
+                        )
                         if downloaded:
                             break
                         logger.warning(f"🔄 第 {retry + 1} 次重试 picsum.photos...")
@@ -236,7 +240,9 @@ class ToutiaoPublisher(BasePublisher):
                 # 如果还是失败，使用随机 seed 再试一次兜底
                 if not downloaded:
                     logger.warning("⚠️ 所有尝试均失败，使用最终兜底方案...")
-                    downloaded = await _download_single_image(f"{fallback_url}?random={random.randint(1, 999999)}", i, is_fallback=True)
+                    downloaded = await _download_single_image(
+                        f"{fallback_url}?random={random.randint(1, 999999)}", i, is_fallback=True
+                    )
 
                 if downloaded:
                     paths.append(downloaded)
@@ -248,9 +254,10 @@ class ToutiaoPublisher(BasePublisher):
                 # 创建一个最小的 JPEG 占位文件
                 import io
                 from PIL import Image
-                img = Image.new('RGB', (800, 600), color='white')
+
+                img = Image.new("RGB", (800, 600), color="white")
                 tmp = os.path.join(tempfile.gettempdir(), f"tt_v61_fallback_{random.randint(10000, 99999)}.jpg")
-                img.save(tmp, 'JPEG')
+                img.save(tmp, "JPEG")
                 paths.append(tmp)
                 logger.info(f"✅ 创建占位图片: {tmp}")
             except ImportError:
@@ -336,7 +343,8 @@ class ToutiaoPublisher(BasePublisher):
                     logger.success("🎯 发布最终确认成功！")
                     return True
 
-                if "articles" in page.url: return True
+                if "articles" in page.url:
+                    return True
             except:
                 pass
             await asyncio.sleep(1)
@@ -345,7 +353,8 @@ class ToutiaoPublisher(BasePublisher):
     async def _fill_and_wake_body(self, page: Page, content: str):
         editor = page.locator(".ProseMirror").first
         await editor.click(force=True)
-        await page.evaluate('''(text) => {
+        await page.evaluate(
+            """(text) => {
             const el = document.querySelector(".ProseMirror");
             if(el) {
                 el.innerHTML = "";
@@ -353,7 +362,9 @@ class ToutiaoPublisher(BasePublisher):
                 dt.setData("text/plain", text);
                 el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
             }
-        }''', content)
+        }""",
+            content,
+        )
         await page.keyboard.press("End")
         await page.keyboard.press("Enter")
         await page.keyboard.press("Backspace")
@@ -369,15 +380,18 @@ class ToutiaoPublisher(BasePublisher):
             await page.keyboard.press("Enter")
             await page.keyboard.press("ArrowUp")
             with open(path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode('utf-8')
-            await page.evaluate('''(b64) => {
+                b64 = base64.b64encode(f.read()).decode("utf-8")
+            await page.evaluate(
+                """(b64) => {
                 const byteCharacters = atob(b64);
                 const byteNumbers = new Array(byteCharacters.length);
                 for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
                 const dt = new DataTransfer();
                 dt.items.add(new File([new Uint8Array(byteNumbers)], "img.jpg", { type: 'image/jpeg' }));
                 document.querySelector(".ProseMirror").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
-            }''', b64)
+            }""",
+                b64,
+            )
             # 🌟 关键修复：增加明确的等待时间，确保图片上传完成
             # V4 后台在处理图片上传时会有进度条，如果立刻执行下一步会导致误触发
             await asyncio.sleep(3)
@@ -426,7 +440,7 @@ class ToutiaoPublisher(BasePublisher):
                     'div:has-text("展示封面") .byte-radio:has-text("单图")',
                     'div:has-text("展示封面") >> text="单图"',
                     '.byte-radio:has-text("单图")',
-                    'text=单图',
+                    "text=单图",
                     'input[type="radio"][value="single"]',
                 ]
 
@@ -452,7 +466,7 @@ class ToutiaoPublisher(BasePublisher):
 
                 # === 步骤 3: 强制显示所有隐藏的 input[type="file"] ===
                 logger.info("🔓 强制显示隐藏的文件输入框...")
-                await page.evaluate('''() => {
+                await page.evaluate("""() => {
                     // 强制显示所有 file input
                     document.querySelectorAll('input[type="file"]').forEach(el => {
                         el.style.display = 'block';
@@ -461,17 +475,17 @@ class ToutiaoPublisher(BasePublisher):
                         el.style.position = 'relative';
                         el.style.zIndex = '9999';
                     });
-                }''')
+                }""")
 
                 # === 步骤 4: 查找封面添加按钮 ===
                 logger.info("🎯 查找封面添加按钮...")
 
                 # 精准定位封面区域的添加按钮
                 cover_add_selectors = [
-                    'div.article-cover-add',
+                    "div.article-cover-add",
                     'div:has-text("展示封面") >> .article-cover-add',
                     'div:has-text("展示封面") >> div:has-text("+")',
-                    '.article-cover-add',
+                    ".article-cover-add",
                     'div[class*="article-cover"] >> div:has-text("+")',
                 ]
 
@@ -502,7 +516,7 @@ class ToutiaoPublisher(BasePublisher):
                             cover_input = parent.locator('input[type="file"]').first
                             if await cover_input.count() == 0:
                                 # 尝试使用 evaluate 直接查找
-                                result = await page.evaluate('''() => {
+                                result = await page.evaluate("""() => {
                                     const addBtn = document.querySelector('div.article-cover-add');
                                     if (!addBtn) return null;
                                     let parent = addBtn.closest('div:has-text("展示封面")') || addBtn.parentElement;
@@ -512,7 +526,7 @@ class ToutiaoPublisher(BasePublisher):
                                         parent = parent.parentElement;
                                     }
                                     return null;
-                                }''')
+                                }""")
                                 if result:
                                     # 找到了，使用最接近的 input
                                     all_inputs = page.locator('input[type="file"]')
@@ -561,9 +575,9 @@ class ToutiaoPublisher(BasePublisher):
 
                 # 检查上传成功的各种标识
                 success_selectors = [
-                    '.article-cover-preview',  # 预览图区域
+                    ".article-cover-preview",  # 预览图区域
                     'div:has-text("展示封面") >> .article-cover-preview',
-                    'text=替换',  # 替换按钮
+                    "text=替换",  # 替换按钮
                     'div:has-text("展示封面") >> text=替换',
                     'img[src*="toutiao.com"]',  # 头条 CDN 图片
                     'img[class*="article-cover"]',
@@ -580,11 +594,11 @@ class ToutiaoPublisher(BasePublisher):
 
                 if upload_success:
                     # 隐藏 input，恢复原状
-                    await page.evaluate('''() => {
+                    await page.evaluate("""() => {
                         document.querySelectorAll('input[type="file"]').forEach(el => {
                             el.style.display = 'none';
                         });
-                    }''')
+                    }""")
                     await page.mouse.click(10, 10)  # 点击空白处
                     await asyncio.sleep(1)
                     return True
@@ -604,7 +618,7 @@ class ToutiaoPublisher(BasePublisher):
         暴力粉碎遮罩层：移除所有可能的弹窗和遮罩
         原因：头条新版后台经常会弹出"新功能提醒"或"手机验证引导"，这些不透明层会挡住"发布"按钮
         """
-        await page.evaluate('''() => {
+        await page.evaluate("""() => {
             const targets = [
                 '.creation-helper',
                 '.byte-icon--close',
@@ -626,12 +640,12 @@ class ToutiaoPublisher(BasePublisher):
                     el.remove();
                 }
             });
-        }''')
+        }""")
 
     def _deep_clean_content(self, text: str) -> str:
-        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-        text = re.sub(r'#+\s*', '', text)
-        text = re.sub(r'\*\*+', '', text)
+        text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+        text = re.sub(r"#+\s*", "", text)
+        text = re.sub(r"\*\*+", "", text)
         return text.strip()
 
     async def _wait_for_publish_result(self, page: Page) -> Dict[str, Any]:
@@ -643,8 +657,10 @@ class ToutiaoPublisher(BasePublisher):
 
 
 # 注册
-registry.register("toutiao", ToutiaoPublisher("toutiao", {
-    "name": "今日头条",
-    "publish_url": "https://mp.toutiao.com/profile_v4/graphic/publish",
-    "color": "#F85959"
-}))
+registry.register(
+    "toutiao",
+    ToutiaoPublisher(
+        "toutiao",
+        {"name": "今日头条", "publish_url": "https://mp.toutiao.com/profile_v4/graphic/publish", "color": "#F85959"},
+    ),
+)

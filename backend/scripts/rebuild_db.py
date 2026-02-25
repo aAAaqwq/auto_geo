@@ -14,6 +14,7 @@ sys.path.insert(0, str(project_root))
 from backend.database import engine, Base
 from loguru import logger
 
+
 def rebuild_database():
     """
     强制重建数据库表
@@ -43,10 +44,11 @@ def rebuild_database():
     # 第三步：验证表结构
     logger.info("步骤 3/3: 验证表结构...")
     from sqlalchemy import inspect
-    inspector = inspect(engine)
-    columns = inspector.get_columns('projects')
 
-    has_domain_keyword = any(col['name'] == 'domain_keyword' for col in columns)
+    inspector = inspect(engine)
+    columns = inspector.get_columns("projects")
+
+    has_domain_keyword = any(col["name"] == "domain_keyword" for col in columns)
 
     if has_domain_keyword:
         logger.success("  ✅ projects 表包含 domain_keyword 字段")
@@ -60,9 +62,11 @@ def rebuild_database():
     logger.info("=" * 50)
     return True
 
+
 if __name__ == "__main__":
     # 检查后端是否在运行
     import sqlite3
+
     db_path = project_root / "backend" / "database" / "auto_geo_v3.db"
 
     if db_path.exists():

@@ -112,7 +112,7 @@ class BaijiahaoPublisher(BasePublisher):
     def _extract_keyword(self, title: str) -> str:
         """从标题中提取关键词用于生成相关图片"""
         # 移除标点和特殊字符，提取核心词
-        cleaned = re.sub(r'[^\w\u4e00-\u9fff]', ' ', title)
+        cleaned = re.sub(r"[^\w\u4e00-\u9fff]", " ", title)
         words = cleaned.split()
         # 返回前 1-2 个核心词
         if words:
@@ -121,7 +121,7 @@ class BaijiahaoPublisher(BasePublisher):
 
     def _split_content_to_chunks(self, content: str, num_chunks: int = 4) -> List[str]:
         """将内容按换行符切成指定数量的块"""
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
         if not lines:
             return [""] * num_chunks
 
@@ -131,7 +131,7 @@ class BaijiahaoPublisher(BasePublisher):
             start = i * chunk_size
             end = (i + 1) * chunk_size if i < num_chunks - 1 else len(lines)
             chunk_lines = lines[start:end]
-            chunks.append('\n'.join(chunk_lines))
+            chunks.append("\n".join(chunk_lines))
         return chunks
 
     async def _download_relevant_images(self, keyword: str, count: int = 4) -> List[str]:
@@ -254,10 +254,7 @@ class BaijiahaoPublisher(BasePublisher):
             for i, text_chunk in enumerate(text_chunks):
                 # 注入当前文字块
                 logger.info(f"📝 注入第 {i + 1} 块文字...")
-                await target_iframe.evaluate(
-                    "(html) => document.execCommand('insertHTML', false, html)",
-                    text_chunk
-                )
+                await target_iframe.evaluate("(html) => document.execCommand('insertHTML', false, html)", text_chunk)
                 await asyncio.sleep(0.5)
 
                 # 如果还有图片，注入图片
@@ -291,10 +288,11 @@ class BaijiahaoPublisher(BasePublisher):
         try:
             # 读取图片文件
             with open(image_path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode('utf-8')
+                b64 = base64.b64encode(f.read()).decode("utf-8")
 
             # 在 iframe 中注入图片
-            await frame.evaluate('''(b64) => {
+            await frame.evaluate(
+                """(b64) => {
                 const byteCharacters = atob(b64);
                 const byteNumbers = new Array(byteCharacters.length);
                 for (let i = 0; i < byteCharacters.length; i++) {
@@ -309,7 +307,9 @@ class BaijiahaoPublisher(BasePublisher):
                     ce.focus();
                     ce.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
                 }
-            }''', b64)
+            }""",
+                b64,
+            )
             logger.info("✅ 图片通过 DataTransfer 协议注入成功")
 
         except Exception as e:
@@ -348,9 +348,7 @@ class BaijiahaoPublisher(BasePublisher):
         """导航到编辑器页面"""
         golden_url = "https://baijiahao.baidu.com/builder/rc/edit?type=news&is_from_cms=1"
 
-        await page.set_extra_http_headers({
-            "Referer": "https://baijiahao.baidu.com/builder/rc/home"
-        })
+        await page.set_extra_http_headers({"Referer": "https://baijiahao.baidu.com/builder/rc/home"})
 
         await page.goto(golden_url, wait_until="networkidle", timeout=60000)
 
@@ -407,7 +405,7 @@ class BaijiahaoPublisher(BasePublisher):
         """封面注入 - DNA 锚点 + expect_file_chooser 方案"""
         try:
             # 步骤 1: 物理触发 DNA 锚点
-            target = page.locator('div._73a3a52aab7e3a36-content').last
+            target = page.locator("div._73a3a52aab7e3a36-content").last
             await target.scroll_into_view_if_needed(timeout=5000)
             await asyncio.sleep(0.3)
             await target.click(force=True)
@@ -416,10 +414,9 @@ class BaijiahaoPublisher(BasePublisher):
             # 步骤 2: 等待弹窗并点击"本地上传"
             await asyncio.sleep(1.0)
 
-            await page.set_extra_http_headers({
-                "Referer": "https://baijiahao.baidu.com/",
-                "Origin": "https://baijiahao.baidu.com"
-            })
+            await page.set_extra_http_headers(
+                {"Referer": "https://baijiahao.baidu.com/", "Origin": "https://baijiahao.baidu.com"}
+            )
 
             async with page.expect_file_chooser(timeout=5000) as fc_info:
                 upload_clicked = False
@@ -546,7 +543,7 @@ class BaijiahaoPublisher(BasePublisher):
             logger.info("🎯 [封面-再次确认] 开始再次确认封面...")
 
             cover_selectors = [
-                'div._73a3a52aab7e3a36-content',
+                "div._73a3a52aab7e3a36-content",
                 'div:has-text("选择封面")',
                 'div:has-text("封面")',
             ]
@@ -646,7 +643,8 @@ class BaijiahaoPublisher(BasePublisher):
         try:
             await page.wait_for_selector('p[dir="auto"]', timeout=10000)
 
-            await page.evaluate("""(text) => {
+            await page.evaluate(
+                """(text) => {
                 const titleEl = document.querySelector('p[dir="auto"]');
                 const container = titleEl.closest('[contenteditable="true"]');
 
@@ -657,7 +655,9 @@ class BaijiahaoPublisher(BasePublisher):
                     container.dispatchEvent(new Event('input', { bubbles: true }));
                     container.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-            }""", title)
+            }""",
+                title,
+            )
 
             await asyncio.sleep(0.3)
             await page.keyboard.press("Enter")
@@ -751,11 +751,7 @@ class BaijiahaoPublisher(BasePublisher):
             # 检查滑块验证
             if await page.locator('div:has-text("安全验证")').count() > 0:
                 logger.warning("🚨 [风控] 触发滑块验证！请在 60 秒内手动完成滑动！")
-                await page.wait_for_selector(
-                    'div:has-text("安全验证")',
-                    state='hidden',
-                    timeout=60000
-                )
+                await page.wait_for_selector('div:has-text("安全验证")', state="hidden", timeout=60000)
                 logger.info("✅ [风控] 检测到滑块消失，继续流程...")
 
             logger.success("✅ [发布] 发布按钮已点击")
@@ -768,10 +764,7 @@ class BaijiahaoPublisher(BasePublisher):
     async def _wait_for_publish_result(self, page: Page) -> Dict[str, Any]:
         """等待发布结果"""
         try:
-            await page.wait_for_url(
-                re.compile(r".*(success|content/index).*"),
-                timeout=30000
-            )
+            await page.wait_for_url(re.compile(r".*(success|content/index).*"), timeout=30000)
             logger.success(f"🎊 [成功] 发布成功: {page.url}")
             return {"success": True, "platform_url": page.url}
 
@@ -781,10 +774,10 @@ class BaijiahaoPublisher(BasePublisher):
 
     def _deep_clean_content(self, text: str) -> str:
         """清理正文内容"""
-        text = re.sub(r'^#\s+.*?\n', '', text)  # 移除首行标题
-        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-        text = re.sub(r'#+\s*', '', text)
-        text = re.sub(r'\*\*+', '', text)
+        text = re.sub(r"^#\s+.*?\n", "", text)  # 移除首行标题
+        text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+        text = re.sub(r"#+\s*", "", text)
+        text = re.sub(r"\*\*+", "", text)
         return text.strip()
 
 
@@ -792,6 +785,6 @@ class BaijiahaoPublisher(BasePublisher):
 BAIJIAHAO_CONFIG = {
     "name": "百家号",
     "publish_url": "https://baijiahao.baidu.com/builder/rc/edit?type=news&is_from_cms=1",
-    "color": "#2932E1"
+    "color": "#2932E1",
 }
 registry.register("baijiahao", BaijiahaoPublisher("baijiahao", BAIJIAHAO_CONFIG))

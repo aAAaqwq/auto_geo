@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class PublishResult:
     """发布结果"""
+
     def __init__(
         self,
         success: bool = False,
@@ -138,6 +139,7 @@ class BasePlatformPublisher:
 
 # ==================== 各平台发布器实现 ====================
 
+
 class ZhihuPublisher(BasePlatformPublisher):
     """知乎发布器 - 最爱用知乎！"""
 
@@ -212,29 +214,31 @@ class BaijiahaoPublisher(BasePlatformPublisher):
                 'input[placeholder*="请输入标题"]',
                 'input[placeholder*="标题"]',
                 'input[class*="title"]',
-                '.write-title-input',
+                ".write-title-input",
                 'input[name="title"]',
-                '.title-input',
+                ".title-input",
             ],
             # 正文输入框选择器
             "content": [
                 '.editor-body[contenteditable="true"]',
-                '#ueditor_textarea',
+                "#ueditor_textarea",
                 '[contenteditable="true"]',
-                '.editor-content',
-                '.write-content',
+                ".editor-content",
+                ".write-content",
             ],
             # 发布按钮选择器
             "publish_button": [
-                '.submit-btn',
+                ".submit-btn",
                 'button[class*="submit"]',
-                '.publish-button',
+                ".publish-button",
                 'button:has-text("发布")',
                 'span:has-text("发布")',
             ],
         }
 
-    async def _click_element_by_selectors(self, page: Page, selectors: List[str], description: str = "元素", timeout: int = 10000) -> bool:
+    async def _click_element_by_selectors(
+        self, page: Page, selectors: List[str], description: str = "元素", timeout: int = 10000
+    ) -> bool:
         """
         尝试用多个选择器点击元素
 
@@ -252,7 +256,9 @@ class BaijiahaoPublisher(BasePlatformPublisher):
                 continue
         return False
 
-    async def _fill_element_by_selectors(self, page: Page, selectors: List[str], value: str, description: str = "元素", timeout: int = 10000) -> bool:
+    async def _fill_element_by_selectors(
+        self, page: Page, selectors: List[str], value: str, description: str = "元素", timeout: int = 10000
+    ) -> bool:
         """
         尝试用多个选择器填充元素
 
@@ -291,10 +297,7 @@ class BaijiahaoPublisher(BasePlatformPublisher):
             # ========== 步骤2: 点击"图文"按钮进入图文发布界面 ==========
             logger.info("尝试点击'图文'按钮...")
             点击成功 = await self._click_element_by_selectors(
-                page,
-                self.selectors["article_button"],
-                "图文按钮",
-                timeout=10000
+                page, self.selectors["article_button"], "图文按钮", timeout=10000
             )
 
             if not 点击成功:
@@ -312,10 +315,7 @@ class BaijiahaoPublisher(BasePlatformPublisher):
             # ========== 步骤3: 填充标题 ==========
             logger.info("填充标题...")
             title_success = await self._fill_element_by_selectors(
-                page,
-                self.selectors["title"],
-                article.title,
-                "标题输入框"
+                page, self.selectors["title"], article.title, "标题输入框"
             )
             if not title_success:
                 return PublishResult(False, error_msg="标题输入框未找到")
@@ -323,10 +323,7 @@ class BaijiahaoPublisher(BasePlatformPublisher):
             # ========== 步骤4: 填充正文 ==========
             logger.info("填充正文...")
             content_success = await self._fill_element_by_selectors(
-                page,
-                self.selectors["content"],
-                article.content,
-                "正文输入框"
+                page, self.selectors["content"], article.content, "正文输入框"
             )
             if not content_success:
                 return PublishResult(False, error_msg="正文输入框未找到")
@@ -337,10 +334,7 @@ class BaijiahaoPublisher(BasePlatformPublisher):
             # ========== 步骤6: 点击发布按钮 ==========
             logger.info("点击发布按钮...")
             publish_success = await self._click_element_by_selectors(
-                page,
-                self.selectors["publish_button"],
-                "发布按钮",
-                timeout=10000
+                page, self.selectors["publish_button"], "发布按钮", timeout=10000
             )
             if not publish_success:
                 return PublishResult(False, error_msg="发布按钮未找到")
@@ -491,6 +485,7 @@ def get_publisher(platform_id: str) -> Optional[BasePlatformPublisher]:
 
 # ==================== 发布任务管理 ====================
 
+
 class PublishTask:
     """发布任务 - 管理单个发布过程"""
 
@@ -547,9 +542,7 @@ class PublishTask:
             if self.account.storage_state:
                 storage_state = self.crypto.decrypt_storage_state(self.account.storage_state)
                 if storage_state:
-                    await context.add_init_script(
-                        f"""Object.assign(window, {json.dumps(storage_state)})"""
-                    )
+                    await context.add_init_script(f"""Object.assign(window, {json.dumps(storage_state)})""")
 
             # 5. 创建页面
             page = await context.new_page()

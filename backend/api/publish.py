@@ -32,6 +32,7 @@ class PublishTaskManager:
     发布任务管理器
     用这个来跟踪批量发布任务！
     """
+
     def __init__(self):
         self._tasks: dict = {}  # task_id -> task_info
 
@@ -42,13 +43,15 @@ class PublishTaskManager:
         sub_tasks = []
         for article_id in article_ids:
             for account_id in account_ids:
-                sub_tasks.append({
-                    "article_id": article_id,
-                    "account_id": account_id,
-                    "status": PublishStatus.PENDING,  # 0=待发布
-                    "platform_url": None,
-                    "error_msg": None,
-                })
+                sub_tasks.append(
+                    {
+                        "article_id": article_id,
+                        "account_id": account_id,
+                        "status": PublishStatus.PENDING,  # 0=待发布
+                        "platform_url": None,
+                        "error_msg": None,
+                    }
+                )
 
         self._tasks[task_id] = {
             "task_id": task_id,
@@ -63,9 +66,15 @@ class PublishTaskManager:
         """获取任务信息"""
         return self._tasks.get(task_id)
 
-    def update_sub_task(self, task_id: str, article_id: int, account_id: int,
-                       status: int, platform_url: Optional[str] = None,
-                       error_msg: Optional[str] = None):
+    def update_sub_task(
+        self,
+        task_id: str,
+        article_id: int,
+        account_id: int,
+        status: int,
+        platform_url: Optional[str] = None,
+        error_msg: Optional[str] = None,
+    ):
         """更新子任务状态"""
         task = self._tasks.get(task_id)
         if not task:
@@ -91,10 +100,12 @@ publish_task_manager = PublishTaskManager()
 # WebSocket管理器（由main.py设置）
 _ws_manager = None
 
+
 def set_ws_manager(ws_mgr):
     """设置WebSocket管理器，避免循环导入"""
     global _ws_manager
     _ws_manager = ws_mgr
+
 
 def get_ws_manager():
     """获取WebSocket管理器"""
@@ -105,10 +116,12 @@ def get_ws_manager():
 def get_playwright_mgr():
     """延迟导入，避免循环依赖"""
     from backend.services.playwright_mgr import playwright_mgr
+
     return playwright_mgr
 
 
 # ==================== API接口 ====================
+
 
 @router.get("/platforms", response_model=ApiResponse)
 async def get_supported_platforms():
@@ -119,13 +132,15 @@ async def get_supported_platforms():
     """
     platforms = []
     for platform_id, config in PLATFORMS.items():
-        platforms.append({
-            "id": platform_id,
-            "name": config.get("name", platform_id),
-            "code": config.get("code", ""),
-            "color": config.get("color", "#333333"),
-            "enabled": True,  # 暂时都启用
-        })
+        platforms.append(
+            {
+                "id": platform_id,
+                "name": config.get("name", platform_id),
+                "code": config.get("code", ""),
+                "color": config.get("color", "#333333"),
+                "enabled": True,  # 暂时都启用
+            }
+        )
 
     return ApiResponse(data={"platforms": platforms})
 
@@ -156,10 +171,7 @@ async def create_publish_task(
     # 2. 检查账号状态
     disabled_accounts = [a.account_name for a in accounts if a.status != 1]
     if disabled_accounts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}"
-        )
+        raise HTTPException(status_code=400, detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}")
 
     # 3. 创建批量发布任务
     task_id = publish_task_manager.create_task(request.article_ids, request.account_ids)
@@ -168,10 +180,11 @@ async def create_publish_task(
     for article_id in request.article_ids:
         for account_id in request.account_ids:
             # 检查是否已有发布记录
-            existing = db.query(PublishRecord).filter(
-                PublishRecord.article_id == article_id,
-                PublishRecord.account_id == account_id
-            ).first()
+            existing = (
+                db.query(PublishRecord)
+                .filter(PublishRecord.article_id == article_id, PublishRecord.account_id == account_id)
+                .first()
+            )
 
             if not existing:
                 record = PublishRecord(
@@ -189,15 +202,16 @@ async def create_publish_task(
 
     logger.info(f"发布任务已创建: {task_id}, 文章数: {len(articles)}, 账号数: {len(accounts)}")
 
-    return ApiResponse(data={
-        "task_id": task_id,
-        "total_tasks": len(articles) * len(accounts),
-        "message": "发布任务已创建，正在后台执行"
-    })
+    return ApiResponse(
+        data={
+            "task_id": task_id,
+            "total_tasks": len(articles) * len(accounts),
+            "message": "发布任务已创建，正在后台执行",
+        }
+    )
 
 
-async def execute_publish_task(task_id: str, articles: List[GeoArticle],
-                               accounts: List[Account]):
+async def execute_publish_task(task_id: str, articles: List[GeoArticle], accounts: List[Account]):
     """
     执行发布任务（后台异步任务）
 
@@ -223,7 +237,7 @@ async def execute_publish_task(task_id: str, articles: List[GeoArticle],
                 "account": account,
                 "status": "pending",
                 "result": None,
-                "error_message": None
+                "error_message": None,
             }
             tasks.append(task)
 
@@ -245,18 +259,18 @@ async def execute_publish_task(task_id: str, articles: List[GeoArticle],
         else:
             return
 
-        publish_task_manager.update_sub_task(
-            task_id, article_id, account_id, status, platform_url, error_msg
-        )
+        publish_task_manager.update_sub_task(task_id, article_id, account_id, status, platform_url, error_msg)
 
         # 更新数据库记录
         from backend.database import SessionLocal
+
         db = SessionLocal()
         try:
-            record = db.query(PublishRecord).filter(
-                PublishRecord.article_id == article_id,
-                PublishRecord.account_id == account_id
-            ).first()
+            record = (
+                db.query(PublishRecord)
+                .filter(PublishRecord.article_id == article_id, PublishRecord.account_id == account_id)
+                .first()
+            )
 
             if record:
                 record.publish_status = status
@@ -264,6 +278,7 @@ async def execute_publish_task(task_id: str, articles: List[GeoArticle],
                 record.error_msg = error_msg
                 if status == PublishStatus.SUCCESS:
                     from datetime import datetime
+
                     record.published_at = datetime.now()
 
                 db.commit()
@@ -273,6 +288,7 @@ async def execute_publish_task(task_id: str, articles: List[GeoArticle],
                     article = db.query(GeoArticle).filter(GeoArticle.id == article_id).first()
                     if article and not article.published_at:
                         from datetime import datetime
+
                         article.published_at = datetime.now()
                     if article and article.status == 0:
                         article.status = 1
@@ -284,26 +300,29 @@ async def execute_publish_task(task_id: str, articles: List[GeoArticle],
 
             if account_obj and article_obj:
                 from backend.config import PLATFORMS
+
                 platform_config = PLATFORMS.get(account_obj.platform, {})
 
                 # 推送WebSocket进度更新
                 ws_mgr = get_ws_manager()
                 if ws_mgr:
-                    await ws_mgr.broadcast({
-                        "type": "publish_progress",
-                        "task_id": task_id,
-                        "data": {
-                            "article_id": article_id,
-                            "article_title": article_obj.title,
-                            "account_id": account_id,
-                            "account_name": account_obj.account_name,
-                            "platform": account_obj.platform,
-                            "platform_name": platform_config.get("name", account_obj.platform),
-                            "status": status,
-                            "platform_url": platform_url,
-                            "error_msg": error_msg,
+                    await ws_mgr.broadcast(
+                        {
+                            "type": "publish_progress",
+                            "task_id": task_id,
+                            "data": {
+                                "article_id": article_id,
+                                "article_title": article_obj.title,
+                                "account_id": account_id,
+                                "account_name": account_obj.account_name,
+                                "platform": account_obj.platform,
+                                "platform_name": platform_config.get("name", account_obj.platform),
+                                "status": status,
+                                "platform_url": platform_url,
+                                "error_msg": error_msg,
+                            },
                         }
-                    })
+                    )
 
         except Exception as e:
             logger.error(f"更新发布记录失败: {e}")
@@ -354,15 +373,13 @@ async def get_publish_progress(task_id: str, db: Session = Depends(get_db)):
 
     if not task_info:
         # 尝试从数据库获取历史记录
-        records = db.query(PublishRecord).order_by(
-            PublishRecord.created_at.desc()
-        ).limit(100).all()
+        records = db.query(PublishRecord).order_by(PublishRecord.created_at.desc()).limit(100).all()
 
         # 如果找不到任务，返回空
         return ApiResponse(
             success=False,
             message="任务不存在或已过期",
-            data={"task_id": task_id, "total": 0, "completed": 0, "failed": 0, "items": []}
+            data={"task_id": task_id, "total": 0, "completed": 0, "failed": 0, "items": []},
         )
 
     # 获取详细信息
@@ -375,28 +392,32 @@ async def get_publish_progress(task_id: str, db: Session = Depends(get_db)):
             continue
 
         platform_config = PLATFORMS.get(account.platform, {})
-        items.append(PublishProgressItem(
-            id=sub_task.get("id", 0),
-            article_id=article.id,
-            article_title=article.title,
-            account_id=account.id,
-            account_name=account.account_name,
-            platform=account.platform,
-            platform_name=platform_config.get("name", account.platform),
-            status=sub_task["status"],
-            platform_url=sub_task.get("platform_url"),
-            error_msg=sub_task.get("error_msg"),
-            created_at=article.created_at,
-            published_at=None,
-        ))
+        items.append(
+            PublishProgressItem(
+                id=sub_task.get("id", 0),
+                article_id=article.id,
+                article_title=article.title,
+                account_id=account.id,
+                account_name=account.account_name,
+                platform=account.platform,
+                platform_name=platform_config.get("name", account.platform),
+                status=sub_task["status"],
+                platform_url=sub_task.get("platform_url"),
+                error_msg=sub_task.get("error_msg"),
+                created_at=article.created_at,
+                published_at=None,
+            )
+        )
 
-    return ApiResponse(data={
-        "task_id": task_id,
-        "total": task_info["total"],
-        "completed": task_info["completed"],
-        "failed": task_info["failed"],
-        "items": items,
-    })
+    return ApiResponse(
+        data={
+            "task_id": task_id,
+            "total": task_info["total"],
+            "completed": task_info["completed"],
+            "failed": task_info["failed"],
+            "items": items,
+        }
+    )
 
 
 @router.get("/records", response_model=List[dict])
@@ -431,21 +452,23 @@ async def get_publish_records(
             platform_config = PLATFORMS.get(account.platform, {})
             platform_name = platform_config.get("name", account.platform)
 
-        result.append({
-            "id": record.id,
-            "article_id": record.article_id,
-            "article_title": article.title if article else "",
-            "account_id": record.account_id,
-            "account_name": account.account_name if account else "",
-            "platform": account.platform if account else "",
-            "platform_name": platform_name,
-            "status": record.publish_status,
-            "platform_url": record.platform_url,
-            "error_msg": record.error_msg,
-            "retry_count": record.retry_count,
-            "created_at": record.created_at.isoformat() if record.created_at else None,
-            "published_at": record.published_at.isoformat() if record.published_at else None,
-        })
+        result.append(
+            {
+                "id": record.id,
+                "article_id": record.article_id,
+                "article_title": article.title if article else "",
+                "account_id": record.account_id,
+                "account_name": account.account_name if account else "",
+                "platform": account.platform if account else "",
+                "platform_name": platform_name,
+                "status": record.publish_status,
+                "platform_url": record.platform_url,
+                "error_msg": record.error_msg,
+                "retry_count": record.retry_count,
+                "created_at": record.created_at.isoformat() if record.created_at else None,
+                "published_at": record.published_at.isoformat() if record.published_at else None,
+            }
+        )
 
     return result
 
@@ -494,18 +517,22 @@ async def retry_publish(
 
     logger.info(f"重试发布任务已创建: {task_id}, 记录ID: {record_id}")
 
-    return ApiResponse(data={
-        "task_id": task_id,
-        "record_id": record_id,
-        "retry_count": record.retry_count,
-        "message": "重试任务已创建"
-    })
+    return ApiResponse(
+        data={
+            "task_id": task_id,
+            "record_id": record_id,
+            "retry_count": record.retry_count,
+            "message": "重试任务已创建",
+        }
+    )
 
 
 # ==================== 批量发布接口（针对 GeoArticle） ====================
 
+
 class BatchPublishRequest(BaseModel):
     """批量发布请求模型（针对 GeoArticle）"""
+
     article_ids: List[int]
     account_ids: List[int]
     # 每篇文章可以指定不同的平台和账号组合
@@ -543,15 +570,12 @@ async def batch_publish_geo_articles(
     invalid_articles = [a.title for a in geo_articles if a.publish_status not in ["completed", "scheduled"]]
 
     if disabled_accounts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}"
-        )
+        raise HTTPException(status_code=400, detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}")
 
     if invalid_articles:
         raise HTTPException(
             status_code=400,
-            detail=f"以下文章状态不可发布（需要 completed 或 scheduled 状态）: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}"
+            detail=f"以下文章状态不可发布（需要 completed 或 scheduled 状态）: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}",
         )
 
     # 3. 为每篇文章绑定选中的平台和账号，更新状态为 publishing
@@ -566,10 +590,11 @@ async def batch_publish_geo_articles(
             article.publish_status = "publishing"
 
             # 检查是否已有发布记录
-            existing = db.query(PublishRecord).filter(
-                PublishRecord.article_id == article.id,
-                PublishRecord.account_id == account.id
-            ).first()
+            existing = (
+                db.query(PublishRecord)
+                .filter(PublishRecord.article_id == article.id, PublishRecord.account_id == account.id)
+                .first()
+            )
 
             if not existing:
                 record = PublishRecord(
@@ -581,14 +606,16 @@ async def batch_publish_geo_articles(
                 publish_records.append(record)
 
             # 添加到任务子任务列表
-            task_subtasks.append({
-                "article_id": article.id,
-                "account_id": account.id,
-                "platform": account.platform,
-                "status": 0,  # 待发布
-                "platform_url": None,
-                "error_msg": None,
-            })
+            task_subtasks.append(
+                {
+                    "article_id": article.id,
+                    "account_id": account.id,
+                    "platform": account.platform,
+                    "status": 0,  # 待发布
+                    "platform_url": None,
+                    "error_msg": None,
+                }
+            )
 
     db.commit()
 
@@ -597,11 +624,14 @@ async def batch_publish_geo_articles(
 
     # 5. 创建异步进度更新函数
     async def update_task_progress(completed: int, total: int):
-        await update_publish_progress(task_id, completed, total, task_subtasks[completed] if completed < len(task_subtasks) else None)
+        await update_publish_progress(
+            task_id, completed, total, task_subtasks[completed] if completed < len(task_subtasks) else None
+        )
 
     # 6. 后台执行发布任务 - 使用 GeoArticleService
     try:
         from backend.services.geo_article_service import GeoArticleService
+
         service = GeoArticleService(db)
 
         total = len(task_subtasks)
@@ -613,7 +643,9 @@ async def batch_publish_geo_articles(
                 if success:
                     subtask["status"] = 2  # 成功
                     subtask["publish_status"] = "published"
-                    subtask["platform_url"] = db.query(GeoArticle).filter(GeoArticle.id == article_id).first().platform_url
+                    subtask["platform_url"] = (
+                        db.query(GeoArticle).filter(GeoArticle.id == article_id).first().platform_url
+                    )
                 else:
                     subtask["status"] = 3  # 失败
                     subtask["error_msg"] = db.query(GeoArticle).filter(GeoArticle.id == article_id).first().error_msg
@@ -650,10 +682,11 @@ async def update_publish_progress(task_id: str, completed: int, total: int, task
 
     db = SessionLocal()
     try:
-        record = db.query(PublishRecord).filter(
-            PublishRecord.article_id == task["article_id"],
-            PublishRecord.account_id == task["account_id"]
-        ).first()
+        record = (
+            db.query(PublishRecord)
+            .filter(PublishRecord.article_id == task["article_id"], PublishRecord.account_id == task["account_id"])
+            .first()
+        )
 
         if record:
             # 更新记录状态
@@ -679,35 +712,40 @@ async def update_publish_progress(task_id: str, completed: int, total: int, task
                 # 推送 WebSocket 进度更新
                 ws_mgr = get_ws_manager()
                 if ws_mgr:
-                    await ws_mgr.broadcast({
-                        "type": "publish_progress",
-                        "task_id": task_id,
-                        "data": {
-                            "article_id": task["article_id"],
-                            "article_title": article.title,
-                            "account_id": task["account_id"],
-                            "platform": task.get("platform"),
-                            "status": record.publish_status,
-                            "platform_url": task.get("platform_url"),
-                            "error_msg": task.get("error_msg"),
-                            "completed": completed,
-                            "total": total,
+                    await ws_mgr.broadcast(
+                        {
+                            "type": "publish_progress",
+                            "task_id": task_id,
+                            "data": {
+                                "article_id": task["article_id"],
+                                "article_title": article.title,
+                                "account_id": task["account_id"],
+                                "platform": task.get("platform"),
+                                "status": record.publish_status,
+                                "platform_url": task.get("platform_url"),
+                                "error_msg": task.get("error_msg"),
+                                "completed": completed,
+                                "total": total,
+                            },
                         }
-                    })
+                    )
     finally:
         db.close()
 
 
 # ==================== 新增：立即发布和定时发布接口 ====================
 
+
 class StartPublishRequest(BaseModel):
     """立即发布请求"""
+
     article_ids: List[int]
     account_ids: List[int]
 
 
 class SchedulePublishRequest(BaseModel):
     """定时发布请求"""
+
     article_ids: List[int]
     account_ids: List[int]
     scheduled_time: str  # ISO格式时间字符串，如 "2024-01-01T10:00:00"
@@ -741,16 +779,13 @@ async def start_publish_immediately(
     if invalid_articles:
         raise HTTPException(
             status_code=400,
-            detail=f"以下文章状态不可发布: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}"
+            detail=f"以下文章状态不可发布: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}",
         )
 
     # 3. 检查账号状态
     disabled_accounts = [a.account_name for a in accounts if a.status != 1]
     if disabled_accounts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}"
-        )
+        raise HTTPException(status_code=400, detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}")
 
     # 4. 更新文章状态为 publishing，设置平台和账号
     for article in geo_articles:
@@ -784,47 +819,40 @@ async def start_publish_immediately(
                     # 更新任务状态
                     if success:
                         publish_task_manager.update_sub_task(
-                            task_id, article_id, account_id,
-                            PublishStatus.SUCCESS,
-                            article.platform_url,
-                            None
+                            task_id, article_id, account_id, PublishStatus.SUCCESS, article.platform_url, None
                         )
                     else:
                         # 获取错误信息
                         db_article = db.query(GeoArticle).filter(GeoArticle.id == article_id).first()
                         error_msg = db_article.error_msg if db_article else "发布失败"
                         publish_task_manager.update_sub_task(
-                            task_id, article_id, account_id,
-                            PublishStatus.FAILED,
-                            None,
-                            error_msg
+                            task_id, article_id, account_id, PublishStatus.FAILED, None, error_msg
                         )
 
                     # WebSocket 推送
                     if ws_mgr:
-                        await ws_mgr.broadcast({
-                            "type": "publish_progress",
-                            "task_id": task_id,
-                            "data": {
-                                "article_id": article_id,
-                                "article_title": article.title,
-                                "account_id": account_id,
-                                "account_name": account.account_name,
-                                "platform": account.platform,
-                                "platform_name": PLATFORMS.get(account.platform, {}).get("name", account.platform),
-                                "status": PublishStatus.SUCCESS if success else PublishStatus.FAILED,
-                                "platform_url": article.platform_url if success else None,
-                                "error_msg": None if success else article.error_msg,
+                        await ws_mgr.broadcast(
+                            {
+                                "type": "publish_progress",
+                                "task_id": task_id,
+                                "data": {
+                                    "article_id": article_id,
+                                    "article_title": article.title,
+                                    "account_id": account_id,
+                                    "account_name": account.account_name,
+                                    "platform": account.platform,
+                                    "platform_name": PLATFORMS.get(account.platform, {}).get("name", account.platform),
+                                    "status": PublishStatus.SUCCESS if success else PublishStatus.FAILED,
+                                    "platform_url": article.platform_url if success else None,
+                                    "error_msg": None if success else article.error_msg,
+                                },
                             }
-                        })
+                        )
 
                 except Exception as e:
                     logger.error(f"发布文章 {article_id} 到账号 {account_id} 失败: {e}")
                     publish_task_manager.update_sub_task(
-                        task_id, article_id, account_id,
-                        PublishStatus.FAILED,
-                        None,
-                        str(e)
+                        task_id, article_id, account_id, PublishStatus.FAILED, None, str(e)
                     )
 
         logger.info(f"立即发布任务完成: {task_id}")
@@ -833,11 +861,13 @@ async def start_publish_immediately(
 
     logger.info(f"立即发布任务已创建: {task_id}, 文章数: {len(geo_articles)}, 账号数: {len(accounts)}")
 
-    return ApiResponse(data={
-        "task_id": task_id,
-        "total_tasks": len(geo_articles) * len(accounts),
-        "message": "立即发布任务已创建，正在执行中"
-    })
+    return ApiResponse(
+        data={
+            "task_id": task_id,
+            "total_tasks": len(geo_articles) * len(accounts),
+            "message": "立即发布任务已创建，正在执行中",
+        }
+    )
 
 
 @router.put("/schedule", response_model=ApiResponse)
@@ -868,12 +898,9 @@ async def schedule_publish(
 
     # 2. 解析定时时间
     try:
-        scheduled_time = datetime.fromisoformat(request.scheduled_time.replace('Z', '+00:00'))
+        scheduled_time = datetime.fromisoformat(request.scheduled_time.replace("Z", "+00:00"))
         if scheduled_time <= datetime.now():
-            raise HTTPException(
-                status_code=400,
-                detail="定时发布时间必须晚于当前时间"
-            )
+            raise HTTPException(status_code=400, detail="定时发布时间必须晚于当前时间")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"时间格式错误: {str(e)}")
 
@@ -882,16 +909,13 @@ async def schedule_publish(
     if invalid_articles:
         raise HTTPException(
             status_code=400,
-            detail=f"以下文章状态不可配置定时发布: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}"
+            detail=f"以下文章状态不可配置定时发布: {', '.join(invalid_articles[:3])}{'...' if len(invalid_articles) > 3 else ''}",
         )
 
     # 4. 检查账号状态
     disabled_accounts = [a.account_name for a in accounts if a.status != 1]
     if disabled_accounts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}"
-        )
+        raise HTTPException(status_code=400, detail=f"以下账号未授权或已禁用: {', '.join(disabled_accounts)}")
 
     # 5. 更新文章状态为 scheduled，设置定时发布信息
     for article in geo_articles:
@@ -905,11 +929,13 @@ async def schedule_publish(
 
     logger.info(f"定时发布已配置: 文章数={len(geo_articles)}, 账号数={len(accounts)}, 定时时间={scheduled_time}")
 
-    return ApiResponse(data={
-        "scheduled_time": scheduled_time.isoformat(),
-        "total_tasks": len(geo_articles) * len(accounts),
-        "message": f"定时发布已配置，将在 {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')} 执行"
-    })
+    return ApiResponse(
+        data={
+            "scheduled_time": scheduled_time.isoformat(),
+            "total_tasks": len(geo_articles) * len(accounts),
+            "message": f"定时发布已配置，将在 {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')} 执行",
+        }
+    )
 
 
 @router.post("/trigger/{article_id}", response_model=ApiResponse)
@@ -930,17 +956,11 @@ async def trigger_publish_immediately(
 
     # 2. 检查是否已配置发布信息
     if not article.platform or not article.account_id:
-        raise HTTPException(
-            status_code=400,
-            detail="文章尚未配置发布信息（平台或账号未设置）"
-        )
+        raise HTTPException(status_code=400, detail="文章尚未配置发布信息（平台或账号未设置）")
 
     # 3. 检查文章状态（支持 scheduled、publishing 或 failed）
     if article.publish_status not in ["scheduled", "publishing", "failed"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"当前文章状态为 {article.publish_status}，不支持手动触发"
-        )
+        raise HTTPException(status_code=400, detail=f"当前文章状态为 {article.publish_status}，不支持手动触发")
 
     # 4. 检查是否正在发布中
     if article.publish_status == "publishing":
@@ -962,12 +982,10 @@ async def trigger_publish_immediately(
 
     # 8. 异步执行发布
     from backend.services.geo_article_service import GeoArticleService
+
     service = GeoArticleService(db)
     asyncio.create_task(service.execute_publish(article_id))
 
     logger.info(f"手动插队发布已触发: article_id={article_id}")
 
-    return ApiResponse(data={
-        "article_id": article_id,
-        "message": "手动插队发布已触发，正在执行中"
-    })
+    return ApiResponse(data={"article_id": article_id, "message": "手动插队发布已触发，正在执行中"})

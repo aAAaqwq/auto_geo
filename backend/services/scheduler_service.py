@@ -22,24 +22,25 @@ from backend.database.models import ScheduledTask, GeoArticle
 # 🌟 统一日志绑定
 log = logger.bind(module="调度中心")
 
+
 class SchedulerService:
     def __init__(self):
-        tz = timezone('Asia/Shanghai') if timezone else None
+        tz = timezone("Asia/Shanghai") if timezone else None
         # 配置调度器，设置较长的误火容忍时间
         self.scheduler = AsyncIOScheduler(
             timezone=tz,
             job_defaults={
-                'misfire_grace_time': 60, # 🌟 允许错过时间后60秒内重试
-                'coalesce': True,         # 积压的任务只跑一次
-                'max_instances': 1        # 同一个Job同时只能跑一个实例
-            }
+                "misfire_grace_time": 60,  # 🌟 允许错过时间后60秒内重试
+                "coalesce": True,  # 积压的任务只跑一次
+                "max_instances": 1,  # 同一个Job同时只能跑一个实例
+            },
         )
         self.db_factory = None
 
         # 🌟 任务映射表
         self.task_registry = {
             "publish_task": self.check_and_publish_scheduled_articles,
-            "monitor_task": self.auto_check_indexing_job
+            "monitor_task": self.auto_check_indexing_job,
         }
 
     def set_db_factory(self, db_factory):
@@ -58,15 +59,15 @@ class SchedulerService:
                         task_key="publish_task",
                         cron_expression="*/1 * * * *",  # 每分钟扫描一次
                         description="扫描待发布文章并触发浏览器自动化脚本",
-                        is_active=True
+                        is_active=True,
                     ),
                     ScheduledTask(
                         name="全网收录实时监测",
                         task_key="monitor_task",
                         cron_expression="*/5 * * * *",  # 每5分钟监测一次
                         description="通过AI搜索引擎检查已发布文章的收录状态",
-                        is_active=True
-                    )
+                        is_active=True,
+                    ),
                 ]
                 db.add_all(defaults)
                 db.commit()
@@ -93,7 +94,7 @@ class SchedulerService:
                     CronTrigger.from_crontab(task.cron_expression),
                     id=task.task_key,
                     replace_existing=True,
-                    misfire_grace_time=60 # 🌟 加固保护
+                    misfire_grace_time=60,  # 🌟 加固保护
                 )
                 log.info(f"📅 任务装载成功: [{task.name}] -> {task.cron_expression}")
             except Exception as e:
@@ -189,14 +190,18 @@ class SchedulerService:
             # 同时也支持失败重试（failed 且 次数<3）
             from sqlalchemy import and_
 
-            pending = db.query(GeoArticle).filter(
-                and_(
-                    GeoArticle.publish_status == "scheduled",
-                    GeoArticle.platform.isnot(None),
-                    GeoArticle.account_id.isnot(None),
-                    GeoArticle.scheduled_at <= now
+            pending = (
+                db.query(GeoArticle)
+                .filter(
+                    and_(
+                        GeoArticle.publish_status == "scheduled",
+                        GeoArticle.platform.isnot(None),
+                        GeoArticle.account_id.isnot(None),
+                        GeoArticle.scheduled_at <= now,
+                    )
                 )
-            ).all()
+                .all()
+            )
 
             if pending:
                 log.info(f"🔍 [发布扫描] 发现 {len(pending)} 篇定时发布文章，准备触发脚本...")
@@ -220,10 +225,11 @@ class SchedulerService:
         db = self.db_factory()
         try:
             # 搜索：已发布 但 未被确认收录的文章
-            pending = db.query(GeoArticle).filter(
-                GeoArticle.publish_status == "published",
-                GeoArticle.index_status != "indexed"
-            ).all()
+            pending = (
+                db.query(GeoArticle)
+                .filter(GeoArticle.publish_status == "published", GeoArticle.index_status != "indexed")
+                .all()
+            )
 
             if pending:
                 log.info(f"📡 [收录扫描] 发现 {len(pending)} 篇已发布文章需要检测效果...")
@@ -235,8 +241,10 @@ class SchedulerService:
         finally:
             db.close()
 
+
 # 单例模式
 _instance = SchedulerService()
+
 
 def get_scheduler_service():
     return _instance

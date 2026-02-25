@@ -33,9 +33,9 @@ class ZhihuPublisher(BasePublisher):
 
             # 2. 图像准备
             # A. 提取正文链接
-            image_urls = re.findall(r'!\[.*?\]\(((?:https?://)?\S+?)\)', article.content)
+            image_urls = re.findall(r"!\[.*?\]\(((?:https?://)?\S+?)\)", article.content)
             # B. 清洗正文
-            clean_content = re.sub(r'!\[.*?\]\(.*?\)', '', article.content)
+            clean_content = re.sub(r"!\[.*?\]\(.*?\)", "", article.content)
 
             # C. 强制补图策略
             if not image_urls:
@@ -68,7 +68,7 @@ class ZhihuPublisher(BasePublisher):
             await self._handle_multi_image_upload(page, downloaded_paths)
 
             # 7. 发布流程
-            topic_word = getattr(article, 'keyword_text', article.title[:4])
+            topic_word = getattr(article, "keyword_text", article.title[:4])
             if not await self._handle_publish_process(page, topic_word):
                 return {"success": False, "error_msg": "发布确认环节失败"}
 
@@ -96,7 +96,8 @@ class ZhihuPublisher(BasePublisher):
                     try:
                         resp = await client.get(url, timeout=20.0)
                         if resp.status_code == 200:
-                            if len(resp.content) < 1000: continue
+                            if len(resp.content) < 1000:
+                                continue
                             tmp_path = os.path.join(tempfile.gettempdir(), f"zh_v42_{random.randint(1000, 9999)}.jpg")
                             with open(tmp_path, "wb") as f:
                                 f.write(resp.content)
@@ -143,9 +144,10 @@ class ZhihuPublisher(BasePublisher):
     async def _paste_image_via_js(self, page: Page, image_path: str):
         """剪贴板注入技术"""
         with open(image_path, "rb") as f:
-            b64_data = base64.b64encode(f.read()).decode('utf-8')
+            b64_data = base64.b64encode(f.read()).decode("utf-8")
 
-        await page.evaluate('''(data) => {
+        await page.evaluate(
+            """(data) => {
             const { b64 } = data;
             const byteCharacters = atob(b64);
             const byteNumbers = new Array(byteCharacters.length);
@@ -166,7 +168,9 @@ class ZhihuPublisher(BasePublisher):
                 cancelable: true
             });
             editor.dispatchEvent(event);
-        }''', {"b64": b64_data})
+        }""",
+            {"b64": b64_data},
+        )
 
     async def _fill_title(self, page: Page, title: str):
         sel = "input[placeholder*='标题'], .WriteIndex-titleInput textarea"
@@ -178,12 +182,15 @@ class ZhihuPublisher(BasePublisher):
         await page.wait_for_selector(editor)
         await page.click(editor)
 
-        await page.evaluate('''(text) => {
+        await page.evaluate(
+            """(text) => {
             const dt = new DataTransfer();
             dt.setData("text/plain", text);
             const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true });
             document.querySelector(".public-DraftEditor-content").dispatchEvent(ev);
-        }''', content)
+        }""",
+            content,
+        )
 
         await asyncio.sleep(2)
         try:
@@ -229,7 +236,8 @@ class ZhihuPublisher(BasePublisher):
             pass
 
         final_btn = page.locator(
-            "button.PublishPanel-submitButton, .WriteIndex-publishButton, button:has-text('发布')").last
+            "button.PublishPanel-submitButton, .WriteIndex-publishButton, button:has-text('发布')"
+        ).last
         for _ in range(5):
             if await final_btn.is_enabled():
                 await final_btn.click(force=True)

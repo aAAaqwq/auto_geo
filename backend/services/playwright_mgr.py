@@ -18,11 +18,9 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from backend.config import (
-    BROWSER_TYPE, BROWSER_ARGS, DEFAULT_USER_AGENT,
-    PLATFORMS
-)
+from backend.config import BROWSER_TYPE, BROWSER_ARGS, DEFAULT_USER_AGENT, PLATFORMS
 from backend.services.crypto import encrypt_cookies, encrypt_storage_state, decrypt_cookies, decrypt_storage_state
+
 # 注意：这里我们只导入 registry，具体的发布器注册逻辑通常在应用启动时完成
 from backend.services.playwright.publishers.base import registry
 
@@ -30,12 +28,7 @@ from backend.services.playwright.publishers.base import registry
 class AuthTask:
     """授权任务模型"""
 
-    def __init__(
-            self,
-            platform: str,
-            account_id: Optional[int] = None,
-            account_name: Optional[str] = None
-    ):
+    def __init__(self, platform: str, account_id: Optional[int] = None, account_name: Optional[str] = None):
         self.task_id = str(uuid.uuid4())
         self.platform = platform
         self.account_id = account_id
@@ -83,7 +76,7 @@ class PlaywrightManager:
             # 如果是类（如 SessionLocal），直接实例化
             try:
                 db_obj = self._db_factory()
-                if hasattr(db_obj, '__next__'):
+                if hasattr(db_obj, "__next__"):
                     return next(db_obj)
                 return db_obj
             except Exception as e:
@@ -103,14 +96,14 @@ class PlaywrightManager:
         chrome_paths = [
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe")
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
         ]
-        
+
         # Mac OS 支持
         if sys.platform == "darwin":
             chrome_paths = [
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+                os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
             ]
 
         executable_path = None
@@ -123,19 +116,19 @@ class PlaywrightManager:
         # 构建启动参数
         # 移除重复参数，保留 config 中的配置
         args = list(BROWSER_ARGS)
-        
+
         # 添加额外的反爬和稳定性参数
         extra_args = [
             "--disable-dev-shm-usage",
             "--disable-background-networking",
             "--disable-features=Translate",
         ]
-        
+
         # 确保不重复添加
         for arg in extra_args:
             if arg not in args:
                 args.append(arg)
-                
+
         # Mac 特殊处理
         if sys.platform == "darwin":
             # Mac 上移除可能导致崩溃的 no-sandbox
@@ -146,19 +139,19 @@ class PlaywrightManager:
                 args.append("--disable-gpu")
 
         # 检测是否在Docker环境中（老王备注：Docker必须用headless）
-        is_docker = os.path.exists('/.dockerenv')
+        is_docker = os.path.exists("/.dockerenv")
         if not is_docker:
             try:
-                with open('/proc/1/cgroup', 'r') as f:
-                    is_docker = 'docker' in f.read()
+                with open("/proc/1/cgroup", "r") as f:
+                    is_docker = "docker" in f.read()
             except:
                 pass
         # 或通过环境变量强制headless
-        force_headless = os.getenv('PLAYWRIGHT_HEADLESS', '').lower() == 'true'
+        force_headless = os.getenv("PLAYWRIGHT_HEADLESS", "").lower() == "true"
 
         launch_options = {
             "headless": is_docker or force_headless,  # Docker环境强制headless
-            "args": args
+            "args": args,
         }
 
         if executable_path:
@@ -194,10 +187,7 @@ class PlaywrightManager:
     # ==================== 授权相关 ====================
 
     async def create_auth_task(
-            self,
-            platform: str,
-            account_id: Optional[int] = None,
-            account_name: Optional[str] = None
+        self, platform: str, account_id: Optional[int] = None, account_name: Optional[str] = None
     ) -> AuthTask:
         """
         创建授权任务：启动浏览器，打开登录页，注入JS桥接
@@ -216,8 +206,7 @@ class PlaywrightManager:
 
         # 创建浏览器上下文
         context = await self._browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent=DEFAULT_USER_AGENT
+            viewport={"width": 1280, "height": 800}, user_agent=DEFAULT_USER_AGENT
         )
         task.context = context
 
@@ -276,14 +265,18 @@ class PlaywrightManager:
             cookies = await task.context.cookies()
 
             # 获取 localStorage 和 sessionStorage
-            storage_data = await task.page.evaluate(
-                "() => ({ localStorage: {...localStorage}, sessionStorage: {...sessionStorage} })") or {}
+            storage_data = (
+                await task.page.evaluate(
+                    "() => ({ localStorage: {...localStorage}, sessionStorage: {...sessionStorage} })"
+                )
+                or {}
+            )
 
             # 构建完整的 storage_state（必须包含 cookies 字段！）
             storage_state = {
                 "cookies": cookies,
                 "localStorage": storage_data.get("localStorage", {}),
-                "sessionStorage": storage_data.get("sessionStorage", {})
+                "sessionStorage": storage_data.get("sessionStorage", {}),
             }
 
             # 2. 基础验证
@@ -339,7 +332,7 @@ class PlaywrightManager:
             # 🔍 调试：输出所有 Cookie
             logger.info(f"[Auth] 平台: {task.platform}, Cookie数量: {len(cookies)}")
             if cookies:
-                cookie_names = [c['name'] for c in cookies]
+                cookie_names = [c["name"] for c in cookies]
                 logger.info(f"[Auth] Cookie列表: {cookie_names}")
             logger.info(f"[Auth] 需要的Cookie: {key_cookie_str}")
 
@@ -348,7 +341,7 @@ class PlaywrightManager:
             if key_cookie_str:
                 required_keys = key_cookie_str.split("|")
                 # 检查是否存在任意一个关键Cookie（不区分大小写）
-                has_auth = any(c['name'].lower() in [k.lower() for k in required_keys] for c in cookies)
+                has_auth = any(c["name"].lower() in [k.lower() for k in required_keys] for c in cookies)
 
                 # 特殊处理：企鹅号如果已经进入后台页面，视为成功
                 if task.platform == "penguin":
@@ -380,7 +373,9 @@ class PlaywrightManager:
                             logger.info(f"[Auth] 微信公众号授权成功，当前页面: {current_url}")
 
                 if not has_auth:
-                    return json.dumps({"success": False, "message": f"未检测到登录凭证 (需要包含: {key_cookie_str})，请确认已登录"})
+                    return json.dumps(
+                        {"success": False, "message": f"未检测到登录凭证 (需要包含: {key_cookie_str})，请确认已登录"}
+                    )
 
             # 3. 提取用户名
             try:
@@ -423,7 +418,7 @@ class PlaywrightManager:
                         cookies=enc_cookies,
                         storage_state=enc_storage,
                         status=1,
-                        last_auth_time=datetime.now()
+                        last_auth_time=datetime.now(),
                     )
                     db.add(account)
                     db.commit()
@@ -435,12 +430,9 @@ class PlaywrightManager:
 
                 # WebSocket 通知
                 if self._ws_callback:
-                    await self._ws_callback({
-                        "type": "auth_complete",
-                        "task_id": task_id,
-                        "success": True,
-                        "platform": task.platform
-                    })
+                    await self._ws_callback(
+                        {"type": "auth_complete", "task_id": task_id, "success": True, "platform": task.platform}
+                    )
 
                 # 延时关闭
                 asyncio.create_task(self._delayed_close_task(task_id))
@@ -467,8 +459,10 @@ class PlaywrightManager:
         """关闭任务资源"""
         task = self._auth_tasks.get(task_id)
         if task:
-            if task.context: await task.context.close()
-            if task_id in self._auth_tasks: del self._auth_tasks[task_id]
+            if task.context:
+                await task.context.close()
+            if task_id in self._auth_tasks:
+                del self._auth_tasks[task_id]
             logger.info(f"[Auth] 任务资源已释放: {task_id}")
 
     async def _extract_username(self, page: Page, platform: str) -> Optional[str]:
@@ -483,7 +477,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "toutiao":
                 selectors = [".user-name", ".name", ".mp-name"]
@@ -491,7 +486,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "wenku":
                 selectors = [".user-info-name", ".user-name", ".name"]
@@ -499,7 +495,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "penguin":
                 selectors = [".header-user-name", ".user-info-name"]
@@ -507,7 +504,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "weixin":
                 selectors = [".weui-desktop-account__name", ".account_name"]
@@ -515,16 +513,26 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "wangyi":
                 # 增加更宽泛的选择器
-                selectors = [".name", ".account-name", ".user-name", ".m-name", ".header-info .name", ".media-info .name", "div[class*='name']"]
+                selectors = [
+                    ".name",
+                    ".account-name",
+                    ".user-name",
+                    ".m-name",
+                    ".header-info .name",
+                    ".media-info .name",
+                    "div[class*='name']",
+                ]
                 for s in selectors:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text and text.strip(): return text.strip()
+                        if text and text.strip():
+                            return text.strip()
 
             elif platform == "sohu":
                 selectors = [".user-name", ".name"]
@@ -532,7 +540,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "zijie":
                 # 字节号（与头条号相同）
@@ -541,7 +550,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "xiaohongshu":
                 # 小红书
@@ -550,7 +560,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "bilibili":
                 # B站专栏
@@ -559,7 +570,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "36kr":
                 # 36氪
@@ -568,7 +580,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "huxiu":
                 # 虎嗅
@@ -577,7 +590,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "woshipm":
                 # 人人都是产品经理
@@ -586,7 +600,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             # 新增平台的用户名提取
             elif platform == "douyin":
@@ -595,7 +610,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "kuaishou":
                 selectors = [".user-name", ".username", ".creator-name"]
@@ -603,7 +619,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "video_account":
                 selectors = [".user-name", ".username", ".nickname"]
@@ -611,7 +628,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "sohu_video":
                 selectors = [".user-name", ".username", ".name"]
@@ -619,7 +637,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "weibo":
                 selectors = [".ScreenName", ".username", ".name"]
@@ -627,7 +646,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "haokan":
                 selectors = [".user-name", ".username", ".name"]
@@ -635,7 +655,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "xigua":
                 selectors = [".user-name", ".username", ".name"]
@@ -643,7 +664,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "jianshu":
                 selectors = [".user-nick", ".username", ".name"]
@@ -651,7 +673,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "iqiyi":
                 selectors = [".user-name", ".username", ".name"]
@@ -659,7 +682,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "dayu":
                 selectors = [".user-name", ".username", ".name"]
@@ -667,7 +691,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "acfun":
                 selectors = [".user-name", ".username", ".nickname"]
@@ -675,7 +700,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "tencent_video":
                 selectors = [".user-name", ".username", ".name"]
@@ -683,7 +709,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "yidian":
                 selectors = [".user-name", ".username", ".name"]
@@ -691,7 +718,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "pipixia":
                 selectors = [".user-name", ".username", ".name"]
@@ -699,7 +727,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "meipai":
                 selectors = [".user-name", ".username", ".name"]
@@ -707,7 +736,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "douban":
                 selectors = [".user-name", ".username", ".name"]
@@ -715,7 +745,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "kuai_chuan":
                 selectors = [".user-name", ".username", ".name"]
@@ -723,7 +754,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "dafeng":
                 selectors = [".user-name", ".username", ".name"]
@@ -731,7 +763,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "xueqiu":
                 selectors = [".user-name", ".username", ".name"]
@@ -739,7 +772,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "yiche":
                 selectors = [".user-name", ".username", ".name"]
@@ -747,7 +781,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "chejia":
                 selectors = [".user-name", ".username", ".name"]
@@ -755,7 +790,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "duoduo":
                 selectors = [".user-name", ".username", ".name"]
@@ -763,7 +799,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "weishi":
                 selectors = [".user-name", ".username", ".name"]
@@ -771,7 +808,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "mango":
                 selectors = [".user-name", ".username", ".name"]
@@ -779,7 +817,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "ximalaya":
                 selectors = [".user-name", ".username", ".name"]
@@ -787,7 +826,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "meituan":
                 selectors = [".user-name", ".username", ".name"]
@@ -795,7 +835,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "alipay":
                 selectors = [".user-name", ".username", ".name"]
@@ -803,7 +844,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "douyin_company":
                 selectors = [".user-name", ".username", ".name"]
@@ -811,7 +853,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             elif platform == "douyin_company_company_lead":
                 selectors = [".user-name", ".username", ".name"]
@@ -819,7 +862,8 @@ class PlaywrightManager:
                     el = await page.query_selector(s)
                     if el:
                         text = await el.text_content()
-                        if text: return text.strip()
+                        if text:
+                            return text.strip()
 
             return None
         except:
@@ -856,8 +900,7 @@ class PlaywrightManager:
                     logger.warning(f"账号 {account.account_name} Session 解析失败，尝试裸奔")
 
             context = await self._browser.new_context(
-                storage_state=state_data if state_data else None,
-                viewport={"width": 1280, "height": 800}
+                storage_state=state_data if state_data else None, viewport={"width": 1280, "height": 800}
             )
 
             page = await context.new_page()

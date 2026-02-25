@@ -17,6 +17,7 @@ PLATFORMS = None  # 将在运行时从config模块获取
 # ==================== 枚举定义 ====================
 class AccountStatus(IntEnum):
     """账号状态"""
+
     DISABLED = 0  # 禁用
     ACTIVE = 1  # 正常
     EXPIRED = -1  # 授权过期
@@ -24,6 +25,7 @@ class AccountStatus(IntEnum):
 
 class PublishStatus(IntEnum):
     """发布状态"""
+
     PENDING = 0  # 待发布
     PUBLISHING = 1  # 发布中
     SUCCESS = 2  # 成功
@@ -32,6 +34,7 @@ class PublishStatus(IntEnum):
 
 class ArticleStatus(IntEnum):
     """文章状态"""
+
     DRAFT = 0  # 草稿
     PUBLISHED = 1  # 已发布
 
@@ -39,6 +42,7 @@ class ArticleStatus(IntEnum):
 # ==================== 通用响应 ====================
 class ApiResponse(BaseModel):
     """统一API响应格式"""
+
     success: bool = True
     message: str = "操作成功"
     data: Optional[dict] = None
@@ -47,6 +51,7 @@ class ApiResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """错误响应"""
+
     success: bool = False
     error: Optional[str] = None
     message: str = "操作失败"
@@ -56,18 +61,25 @@ class ErrorResponse(BaseModel):
 # ==================== 账号相关 ====================
 class AccountBase(BaseModel):
     """账号基础信息"""
-    platform: str = Field(..., description="平台ID", pattern="^(zhihu|baijiahao|sohu|toutiao|wenku|penguin|weixin|wangyi|zijie|xiaohongshu|bilibili|36kr|huxiu|woshipm|douyin|kuaishou|video_account|sohu_video|weibo|haokan|xigua|jianshu|iqiyi|dayu|acfun|tencent_video|yidian|pipixia|meipai|douban|kuai_chuan|dafeng|xueqiu|yiche|chejia|duoduo|weishi|mango|ximalaya|meituan|alipay|douyin_company|douyin_company_lead|custom)$")
+
+    platform: str = Field(
+        ...,
+        description="平台ID",
+        pattern="^(zhihu|baijiahao|sohu|toutiao|wenku|penguin|weixin|wangyi|zijie|xiaohongshu|bilibili|36kr|huxiu|woshipm|douyin|kuaishou|video_account|sohu_video|weibo|haokan|xigua|jianshu|iqiyi|dayu|acfun|tencent_video|yidian|pipixia|meipai|douban|kuai_chuan|dafeng|xueqiu|yiche|chejia|duoduo|weishi|mango|ximalaya|meituan|alipay|douyin_company|douyin_company_lead|custom)$",
+    )
     account_name: str = Field(..., min_length=1, max_length=100, description="账号备注名称")
     remark: Optional[str] = Field(None, description="备注信息")
 
 
 class AccountCreate(AccountBase):
     """创建账号请求"""
+
     pass
 
 
 class AccountUpdate(BaseModel):
     """更新账号请求"""
+
     account_name: Optional[str] = Field(None, min_length=1, max_length=100)
     status: Optional[int] = Field(None, ge=-1, le=1)
     remark: Optional[str] = None
@@ -75,6 +87,7 @@ class AccountUpdate(BaseModel):
 
 class AccountResponse(AccountBase):
     """账号响应"""
+
     id: int
     username: Optional[str] = None
     status: int
@@ -88,6 +101,7 @@ class AccountResponse(AccountBase):
 
 class AccountDetailResponse(AccountResponse):
     """账号详情（含授权状态）"""
+
     is_authorized: bool = False
     platform_info: Optional[dict] = None
 
@@ -95,6 +109,7 @@ class AccountDetailResponse(AccountResponse):
 # ==================== 授权相关 ====================
 class AuthStartRequest(BaseModel):
     """开始授权请求"""
+
     platform: str = Field(..., description="平台ID")
     account_id: Optional[int] = Field(None, description="账号ID，更新授权时使用")
     account_name: Optional[str] = Field(None, description="账号名称，新账号时使用")
@@ -102,12 +117,14 @@ class AuthStartRequest(BaseModel):
 
 class AuthStartResponse(BaseModel):
     """开始授权响应"""
+
     task_id: str
     message: str = "浏览器已打开，请完成登录"
 
 
 class AuthStatusResponse(BaseModel):
     """授权状态响应"""
+
     task_id: str
     status: str  # pending, running, success, failed, timeout
     is_logged_in: bool = False
@@ -118,6 +135,7 @@ class AuthStatusResponse(BaseModel):
 # ==================== 文章相关 ====================
 class ArticleBase(BaseModel):
     """文章基础信息"""
+
     title: str = Field(..., min_length=1, max_length=200, description="文章标题")
     content: str = Field(..., min_length=1, description="文章内容")
     tags: Optional[str] = Field(None, description="标签，逗号分隔")
@@ -127,11 +145,13 @@ class ArticleBase(BaseModel):
 
 class ArticleCreate(ArticleBase):
     """创建文章请求"""
+
     pass
 
 
 class ArticleUpdate(BaseModel):
     """更新文章请求"""
+
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     content: Optional[str] = Field(None, min_length=1)
     tags: Optional[str] = None
@@ -142,6 +162,7 @@ class ArticleUpdate(BaseModel):
 
 class ArticleResponse(ArticleBase):
     """文章响应"""
+
     id: int
     status: int
     view_count: int
@@ -155,6 +176,7 @@ class ArticleResponse(ArticleBase):
 
 class ArticleListResponse(BaseModel):
     """文章列表响应"""
+
     total: int
     items: List[ArticleResponse]
 
@@ -162,12 +184,14 @@ class ArticleListResponse(BaseModel):
 # ==================== 发布相关 ====================
 class PublishTaskCreate(BaseModel):
     """创建发布任务请求"""
+
     article_ids: List[int] = Field(..., min_items=1, description="文章ID列表")
     account_ids: List[int] = Field(..., min_items=1, description="账号ID列表")
 
 
 class PublishTaskResponse(BaseModel):
     """发布任务响应"""
+
     task_id: str
     total_tasks: int
     message: str = "发布任务已创建"
@@ -175,6 +199,7 @@ class PublishTaskResponse(BaseModel):
 
 class PublishProgressItem(BaseModel):
     """单条发布进度"""
+
     id: int
     article_id: int
     article_title: str
@@ -191,6 +216,7 @@ class PublishProgressItem(BaseModel):
 
 class PublishProgressResponse(BaseModel):
     """发布进度响应"""
+
     task_id: str
     total: int
     completed: int
@@ -200,6 +226,7 @@ class PublishProgressResponse(BaseModel):
 
 class PublishRecordResponse(BaseModel):
     """发布记录响应"""
+
     id: int
     article_id: int
     article_title: str
@@ -218,6 +245,7 @@ class PublishRecordResponse(BaseModel):
 # ==================== 账号验证相关 ====================
 class AccountCheckResult(BaseModel):
     """单个账号检测结果"""
+
     account_id: int
     platform: str
     account_name: str
@@ -229,6 +257,7 @@ class AccountCheckResult(BaseModel):
 
 class AccountCheckSummary(BaseModel):
     """批量检测汇总结果"""
+
     total: int
     success: int
     failed: int

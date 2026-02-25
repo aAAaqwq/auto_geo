@@ -57,7 +57,7 @@ DATABASE_URL = f"sqlite:///{DATABASE_DIR}/auto_geo_v3.db"
 # AES-256加密密钥（32字节）- 生产环境必须从环境变量读取
 ENCRYPTION_KEY = os.getenv(
     "AUTO_GEO_ENCRYPTION_KEY",
-    "auto-geo-default-key-32-bytes-length!!"  # 32字节密钥
+    "auto-geo-default-key-32-bytes-length!!",  # 32字节密钥
 ).encode()[:32]  # 确保是32字节
 
 # ==================== Playwright配置 ====================
@@ -72,11 +72,13 @@ BROWSER_ARGS = [
     "--disable-infobars",
     "--window-size=1920,1080",
     "--disable-gpu",  # [新增] 兼容 macOS 和部分 Windows 环境
-    "--disable-dev-shm-usage", # [新增] 避免容器环境内存不足
+    "--disable-dev-shm-usage",  # [新增] 避免容器环境内存不足
 ]
 
 # 默认 User-Agent (保持统一，防止 Session 因 UA 不一致失效)
-DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+)
 
 # 用户数据目录
 USER_DATA_DIR = DATA_DIR / "browser_context"

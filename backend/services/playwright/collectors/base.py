@@ -16,6 +16,7 @@ from loguru import logger
 @dataclass
 class CollectedArticle:
     """收集到的文章数据结构"""
+
     title: str
     url: str
     content: str
@@ -94,17 +95,19 @@ class BaseCollector(ABC):
             for article in trending_articles:
                 content = await self.extract_content(page, article["url"])
                 if content:
-                    collected.append(CollectedArticle(
-                        title=article.get("title", ""),
-                        url=article.get("url", ""),
-                        content=content,
-                        likes=article.get("likes", 0),
-                        reads=article.get("reads", 0),
-                        comments=article.get("comments", 0),
-                        author=article.get("author", ""),
-                        platform=self.platform_id,
-                        publish_time=article.get("publish_time", "")
-                    ))
+                    collected.append(
+                        CollectedArticle(
+                            title=article.get("title", ""),
+                            url=article.get("url", ""),
+                            content=content,
+                            likes=article.get("likes", 0),
+                            reads=article.get("reads", 0),
+                            comments=article.get("comments", 0),
+                            author=article.get("author", ""),
+                            platform=self.platform_id,
+                            publish_time=article.get("publish_time", ""),
+                        )
+                    )
 
             return collected
 
@@ -125,8 +128,7 @@ class BaseCollector(ABC):
 
             if likes > self.min_likes or reads > self.min_reads:
                 trending.append(article)
-                logger.debug(f"[{self.name}] 爆火: {article.get('title', '')[:30]}... "
-                           f"(👍{likes}, 👁{reads})")
+                logger.debug(f"[{self.name}] 爆火: {article.get('title', '')[:30]}... (👍{likes}, 👁{reads})")
 
         return trending
 
@@ -173,21 +175,21 @@ class BaseCollector(ABC):
                 # 随机滚动距离
                 scroll_step = random.randint(300, 800)
                 current_position += scroll_step
-                
+
                 # 执行滚动
                 await page.evaluate(f"window.scrollTo(0, {current_position})")
-                
+
                 # 随机等待，模拟阅读
                 await self._random_sleep(0.5, 1.5)
-                
+
                 # 更新高度（处理动态加载）
                 new_total_height = await page.evaluate("document.body.scrollHeight")
                 if new_total_height > total_height:
                     total_height = new_total_height
-                    
+
                 scroll_count += 1
                 logger.debug(f"[{self.name}] 模拟滚动 {scroll_count}/{max_scrolls}")
-                    
+
         except Exception as e:
             logger.warning(f"[{self.name}] 滚动模拟异常: {e}")
 
@@ -203,20 +205,20 @@ class BaseCollector(ABC):
 
             # 2. 常见弹窗选择器
             popup_selectors = [
-                ".Modal-wrapper", # 知乎登录弹窗
-                ".login-modal", 
+                ".Modal-wrapper",  # 知乎登录弹窗
+                ".login-modal",
                 ".captcha-box",
-                ".sign-flow-modal", # 知乎登录
-                "[class*='login-modal']", # 通用登录模态框
+                ".sign-flow-modal",  # 知乎登录
+                "[class*='login-modal']",  # 通用登录模态框
                 "[class*='LoginModal']",
-                ".SignFlow", # 知乎
-                ".Button.SignFlow-submitButton", # 知乎登录按钮
-                "iframe[src*='login']", # 登录 iframe
-                "#captcha-verify-image", # 验证码
-                "div[class*='captcha']", # 通用验证码容器
-                ".verify-bar-close", # 验证条关闭按钮
+                ".SignFlow",  # 知乎
+                ".Button.SignFlow-submitButton",  # 知乎登录按钮
+                "iframe[src*='login']",  # 登录 iframe
+                "#captcha-verify-image",  # 验证码
+                "div[class*='captcha']",  # 通用验证码容器
+                ".verify-bar-close",  # 验证条关闭按钮
             ]
-            
+
             needs_login = False
             for selector in popup_selectors:
                 if await page.query_selector(selector):
@@ -225,14 +227,14 @@ class BaseCollector(ABC):
                         needs_login = True
                         logger.warning(f"[{self.name}] 发现登录弹窗选择器: {selector}")
                         break
-            
+
             # 3. 检查页面文本（作为兜底）
             if not needs_login:
                 # 检查标题
                 title = await page.title()
                 if "登录" in title or "安全验证" in title:
-                     needs_login = True
-                     logger.warning(f"[{self.name}] 页面标题包含登录关键词: {title}")
+                    needs_login = True
+                    logger.warning(f"[{self.name}] 页面标题包含登录关键词: {title}")
 
                 # 只获取 body 文本，避免获取完整 HTML 导致过慢
                 # 限制文本长度检查，只查前 1000 个字符或者特定区域
@@ -240,8 +242,17 @@ class BaseCollector(ABC):
                     try:
                         # 快速检查 body 的 textContent，如果太长可能会卡
                         # 优化：只检查特定元素是否存在文本
-                        login_keywords = ["登录后查看更多", "请登录", "扫码登录", "验证码", "安全验证", "注册/登录", "依次点击", "拖动滑块"]
-                        
+                        login_keywords = [
+                            "登录后查看更多",
+                            "请登录",
+                            "扫码登录",
+                            "验证码",
+                            "安全验证",
+                            "注册/登录",
+                            "依次点击",
+                            "拖动滑块",
+                        ]
+
                         # 使用 evaluate 快速在浏览器端检查，减少传输
                         js_check = """
                             () => {
@@ -251,37 +262,37 @@ class BaseCollector(ABC):
                             }
                         """
                         if await page.evaluate(js_check):
-                             # 再次确认不是误报（比如文章内容里有这些词）
-                             # 这里假设如果包含这些词，大概率是拦截提示
-                             needs_login = True
-                             logger.warning(f"[{self.name}] 页面文本包含登录关键词")
+                            # 再次确认不是误报（比如文章内容里有这些词）
+                            # 这里假设如果包含这些词，大概率是拦截提示
+                            needs_login = True
+                            logger.warning(f"[{self.name}] 页面文本包含登录关键词")
                     except Exception:
                         pass
 
             if needs_login:
                 await self._wait_for_manual_login(page)
-                
+
         except Exception as e:
             # 这里的异常不应该阻断流程，只是记录日志
             logger.debug(f"[{self.name}] 登录检测异常: {e}")
 
     async def _wait_for_manual_login(self, page: Page):
         """等待手动登录"""
-        logger.warning("\n" + "!"*50)
+        logger.warning("\n" + "!" * 50)
         logger.warning(f"[{self.name}] 检测到登录弹窗或验证码！")
         logger.warning("请在 45 秒内手动完成登录/验证操作...")
-        logger.warning("!"*50 + "\n")
-        
+        logger.warning("!" * 50 + "\n")
+
         # 给用户 45 秒时间手动操作
         # 每 5 秒检查一次是否登录成功（可选，这里简单等待）
         for i in range(9):
             await asyncio.sleep(5)
-            logger.info(f"[{self.name}] 剩余等待时间: {45 - (i+1)*5} 秒...")
-            
+            logger.info(f"[{self.name}] 剩余等待时间: {45 - (i + 1) * 5} 秒...")
+
             # 如果弹窗消失了，提前结束等待
             # 这里简单实现，假设用户操作完后弹窗会消失
             # 实际上很难通用判断，所以还是硬等待比较稳妥
-            
+
         logger.info(f"[{self.name}] 手动操作时间结束，继续执行...")
 
 

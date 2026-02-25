@@ -13,7 +13,7 @@ from backend.database import get_db
 from backend.services.notification_service import (
     get_notification_service,
     WebSocketNotificationChannel,
-    LogNotificationChannel
+    LogNotificationChannel,
 )
 from backend.schemas import ApiResponse
 from loguru import logger
@@ -24,8 +24,10 @@ router = APIRouter(prefix="/api/notifications", tags=["预警通知"])
 
 # ==================== 请求/响应模型 ====================
 
+
 class AlertRuleUpdate(BaseModel):
     """预警规则更新"""
+
     rule_name: str
     threshold: Optional[float] = None
     enabled: Optional[bool] = None
@@ -33,6 +35,7 @@ class AlertRuleUpdate(BaseModel):
 
 class AlertSummaryResponse(BaseModel):
     """预警摘要响应"""
+
     total_keywords: int
     alert_keywords: int
     critical_count: int
@@ -43,6 +46,7 @@ class AlertSummaryResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     """预警响应"""
+
     type: str
     level: str
     keyword: str
@@ -65,11 +69,12 @@ def set_ws_callback(callback):
 
 # ==================== 预警API ====================
 
+
 @router.post("/check", response_model=List[AlertResponse])
 async def check_alerts(
     background_tasks: BackgroundTasks,
     project_id: Optional[int] = Query(None, description="项目ID，不填则检查所有"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     执行预警检查
@@ -92,8 +97,7 @@ async def check_alerts(
 
 @router.get("/summary", response_model=AlertSummaryResponse)
 async def get_alert_summary(
-    project_id: Optional[int] = Query(None, description="项目ID"),
-    db: Session = Depends(get_db)
+    project_id: Optional[int] = Query(None, description="项目ID"), db: Session = Depends(get_db)
 ):
     """
     获取预警摘要
@@ -113,20 +117,15 @@ async def get_alert_rules():
     注意：返回所有可配置的预警规则！
     """
     from backend.services.notification_service import NotificationService
+
     rules = {}
     for key, rule in NotificationService.ALERT_RULES.items():
-        rules[key] = {
-            "name": rule.name,
-            "threshold": rule.threshold,
-            "enabled": rule.enabled
-        }
+        rules[key] = {"name": rule.name, "threshold": rule.threshold, "enabled": rule.enabled}
     return rules
 
 
 @router.post("/trigger-test", response_model=ApiResponse)
-async def trigger_test_alert(
-    db: Session = Depends(get_db)
-):
+async def trigger_test_alert(db: Session = Depends(get_db)):
     """
     触发测试预警
 
@@ -139,7 +138,7 @@ async def trigger_test_alert(
         "project": "测试项目",
         "company": "测试公司",
         "message": "这是一条测试预警通知",
-        "timestamp": "2024-01-01T00:00:00"
+        "timestamp": "2024-01-01T00:00:00",
     }
 
     service = get_notification_service(db)
@@ -158,7 +157,4 @@ async def trigger_test_alert(
 @router.get("/health")
 async def notification_health():
     """健康检查"""
-    return {
-        "status": "ok",
-        "ws_callback_configured": _ws_callback is not None
-    }
+    return {"status": "ok", "ws_callback_configured": _ws_callback is not None}

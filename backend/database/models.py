@@ -15,6 +15,7 @@ TABLE_ARGS = {"extend_existing": True}
 
 class Account(Base):
     """账号表"""
+
     __tablename__ = "accounts"
     __table_args__ = TABLE_ARGS
 
@@ -39,6 +40,7 @@ class ScheduledTask(Base):
     """
     定时任务配置表
     """
+
     __tablename__ = "scheduled_tasks"
     __table_args__ = TABLE_ARGS
 
@@ -57,11 +59,13 @@ class ScheduledTask(Base):
 
 # ==================== 客户管理相关表 ====================
 
+
 class Client(Base):
     """
     客户表
     存储客户/公司信息，一个客户可以有多个项目
     """
+
     __tablename__ = "clients"
     __table_args__ = TABLE_ARGS
 
@@ -111,21 +115,22 @@ class PublishRecord(Base):
     发布记录表
     记录文章到各平台的发布状态
     """
+
     __tablename__ = "publish_records"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
 
     # 外键
-    article_id = Column(Integer, ForeignKey("geo_articles.id", ondelete="CASCADE"), nullable=False, index=True, comment="文章ID")
-    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True, comment="账号ID")
+    article_id = Column(
+        Integer, ForeignKey("geo_articles.id", ondelete="CASCADE"), nullable=False, index=True, comment="文章ID"
+    )
+    account_id = Column(
+        Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True, comment="账号ID"
+    )
 
     # 发布状态
-    publish_status = Column(
-        Integer,
-        default=0,
-        comment="发布状态：0=待发布 1=发布中 2=成功 3=失败"
-    )
+    publish_status = Column(Integer, default=0, comment="发布状态：0=待发布 1=发布中 2=成功 3=失败")
 
     # 结果
     platform_url = Column(String(500), nullable=True, comment="发布后的文章链接")
@@ -148,18 +153,22 @@ class PublishRecord(Base):
 
 # ==================== GEO相关表 ====================
 
+
 class Project(Base):
     """
     项目表
     存储项目信息，一个客户可以有多个项目
     """
+
     __tablename__ = "projects"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
 
     # 关联客户
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=True, index=True, comment="客户ID")
+    client_id = Column(
+        Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=True, index=True, comment="客户ID"
+    )
 
     # 项目信息
     name = Column(String(200), nullable=False, comment="项目名称")
@@ -188,11 +197,14 @@ class Keyword(Base):
     关键词表
     存储AI分析出的高价值关键词
     """
+
     __tablename__ = "keywords"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True, comment="项目ID")
+    project_id = Column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True, comment="项目ID"
+    )
     keyword = Column(String(200), nullable=False, comment="关键词")
     difficulty_score = Column(Integer, nullable=True, comment="难度评分（0-100）")
 
@@ -217,11 +229,14 @@ class QuestionVariant(Base):
     问题变体表
     存储基于关键词生成的不同问法
     """
+
     __tablename__ = "question_variants"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
+    keyword_id = Column(
+        Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID"
+    )
     question = Column(Text, nullable=False, comment="问题变体")
 
     # 时间戳
@@ -239,11 +254,14 @@ class IndexCheckRecord(Base):
     收录检测记录表
     存储AI平台收录检测结果
     """
+
     __tablename__ = "index_check_records"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
+    keyword_id = Column(
+        Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID"
+    )
     platform = Column(String(50), nullable=False, comment="检测平台：doubao/qianwen/deepseek")
     question = Column(Text, nullable=False, comment="检测时使用的问题")
     answer = Column(Text, nullable=True, comment="AI回答内容")
@@ -267,12 +285,17 @@ class GeoArticle(Base):
     GEO文章表
     存储AI生成的文章及质检信息
     """
+
     __tablename__ = "geo_articles"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    keyword_id = Column(Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID")
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True, comment="项目ID")
+    keyword_id = Column(
+        Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False, index=True, comment="关键词ID"
+    )
+    project_id = Column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True, comment="项目ID"
+    )
     title = Column(Text, nullable=True, comment="文章标题")
     content = Column(Text, nullable=False, comment="文章正文内容")
 
@@ -285,13 +308,21 @@ class GeoArticle(Base):
     # 发布相关
     platform = Column(String(50), nullable=True, comment="目标发布平台：仅在配置发布时填写，生成阶段为空")
     account_id = Column(Integer, nullable=True, comment="目标账号ID：仅在配置发布时填写，生成阶段为空")
-    publish_status = Column(String(20), default="draft", comment="发布状态：draft=草稿 generating=生成中 completed=已生成待分发 scheduled=已配置定时发布 publishing=发布中 published=已发布 failed=发布失败")
+    publish_status = Column(
+        String(20),
+        default="draft",
+        comment="发布状态：draft=草稿 generating=生成中 completed=已生成待分发 scheduled=已配置定时发布 publishing=发布中 published=已发布 failed=发布失败",
+    )
     publish_time = Column(DateTime, nullable=True, comment="发布时间")
     scheduled_at = Column(DateTime, nullable=True, comment="定时发布时间：仅在定时发布时设置")
 
     # 发布策略字段（新增）
-    target_platforms = Column(JSON, nullable=True, comment="预设目标平台列表（JSON数组）：如 ['zhihu', 'sohu', 'baijiahao']，用于多平台发布")
-    publish_strategy = Column(String(20), default="draft", comment="发布策略：draft=仅生成草稿 immediate=生成后立即发布 scheduled=定时发布")
+    target_platforms = Column(
+        JSON, nullable=True, comment="预设目标平台列表（JSON数组）：如 ['zhihu', 'sohu', 'baijiahao']，用于多平台发布"
+    )
+    publish_strategy = Column(
+        String(20), default="draft", comment="发布策略：draft=仅生成草稿 immediate=生成后立即发布 scheduled=定时发布"
+    )
 
     # 强壮性与重试 (Added back from v1)
     retry_count = Column(Integer, default=0)
@@ -318,11 +349,13 @@ class GeoArticle(Base):
 
 # ==================== 知识库相关表 ====================
 
+
 class KnowledgeCategory(Base):
     """
     知识库分类表（企业分类）
     存储企业/客户的知识库分类信息
     """
+
     __tablename__ = "knowledge_categories"
     __table_args__ = TABLE_ARGS
 
@@ -352,14 +385,21 @@ class Knowledge(Base):
     知识库条目表
     存储企业相关的知识内容
     """
+
     __tablename__ = "knowledge_items"
     __table_args__ = TABLE_ARGS
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    category_id = Column(Integer, ForeignKey("knowledge_categories.id", ondelete="CASCADE"), nullable=False, index=True, comment="分类ID")
+    category_id = Column(
+        Integer, ForeignKey("knowledge_categories.id", ondelete="CASCADE"), nullable=False, index=True, comment="分类ID"
+    )
     title = Column(String(200), nullable=False, comment="知识标题")
     content = Column(Text, nullable=False, comment="知识内容")
-    type = Column(String(50), default="other", comment="知识类型：company_intro=企业介绍 product=产品服务 industry=行业知识 faq=常见问题 other=其他")
+    type = Column(
+        String(50),
+        default="other",
+        comment="知识类型：company_intro=企业介绍 product=产品服务 industry=行业知识 faq=常见问题 other=其他",
+    )
 
     # 状态
     status = Column(Integer, default=1, comment="状态：1=启用 0=停用")
@@ -377,11 +417,13 @@ class Knowledge(Base):
 
 # ==================== 用户相关表 ====================
 
+
 class User(Base):
     """
     用户表
     存储系统用户信息
     """
+
     __tablename__ = "users"
     __table_args__ = TABLE_ARGS
 
@@ -389,10 +431,10 @@ class User(Base):
     username = Column(String(100), nullable=False, unique=True, comment="用户名")
     email = Column(String(200), nullable=True, unique=True, comment="邮箱")
     password_hash = Column(String(200), nullable=True, comment="密码哈希")
-    
+
     # 状态
     status = Column(Integer, default=1, comment="状态：1=活跃 0=禁用")
-    
+
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
@@ -403,11 +445,13 @@ class User(Base):
 
 # ==================== 参考文章表（爆火文章收集）====================
 
+
 class ReferenceArticle(Base):
     """
     参考文章表
     存储从各平台采集的爆火/热门文章，用于内容创作参考
     """
+
     __tablename__ = "reference_articles"
     __table_args__ = TABLE_ARGS
 
@@ -448,6 +492,7 @@ class ReferenceArticle(Base):
     def __repr__(self):
         return f"<ReferenceArticle {self.title[:30]}... ({self.platform})>"
 
+
 # ==================== AEO网站信息收集表 ====================
 class SiteProject(Base):
     __tablename__ = "site_projects"
@@ -455,13 +500,13 @@ class SiteProject(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, comment="项目名称，如：极速物流官网")
     site_id = Column(String, unique=True, index=True, comment="唯一标识，用于生成路径")
-    
+
     # 核心配置：存储前端传来的那个大 JSON
     config_data = Column(JSON, comment="网站的全量配置数据")
-    
+
     # 状态管理
     deploy_path = Column(String, nullable=True, comment="生成的本地 index.html 路径")
     preview_url = Column(String, nullable=True, comment="本地预览 URL")
-    
+
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

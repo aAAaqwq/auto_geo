@@ -25,7 +25,7 @@ async def research_image_upload():
     try:
         # 获取账号
         db = SessionLocal()
-        account = db.query(Account).filter(Account.platform == 'zhihu').first()
+        account = db.query(Account).filter(Account.platform == "zhihu").first()
         if not account:
             logger.error("❌ 没有知乎账号")
             db.close()
@@ -39,6 +39,7 @@ async def research_image_upload():
         playwright = await async_playwright().start()
 
         import os
+
         chrome_paths = [
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -81,13 +82,13 @@ async def research_image_upload():
         page = await context.new_page()
 
         # 访问发布页面
-        await page.goto(PLATFORMS['zhihu']['publish_url'], timeout=60000, wait_until="domcontentloaded")
+        await page.goto(PLATFORMS["zhihu"]["publish_url"], timeout=60000, wait_until="domcontentloaded")
         await asyncio.sleep(5)
 
         # ==================== 研究图片上传相关元素 ====================
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究图片上传相关元素")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         # 1. 查找工具栏中的图片按钮
         toolbar_elements = await page.evaluate("""
@@ -218,6 +219,7 @@ async def research_image_upload():
     except Exception as e:
         logger.error(f"❌ 研究失败: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
         return False
 

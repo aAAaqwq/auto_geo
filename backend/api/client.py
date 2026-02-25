@@ -24,7 +24,7 @@ async def get_clients(
     status: Optional[int] = Query(None, description="状态筛选"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
     industry: Optional[str] = Query(None, description="行业筛选"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     获取客户列表
@@ -71,13 +71,7 @@ async def get_clients(
         }
         items.append(item)
 
-    return {
-        "success": True,
-        "total": total,
-        "items": items,
-        "page": page,
-        "limit": limit
-    }
+    return {"success": True, "total": total, "items": items, "page": page, "limit": limit}
 
 
 @router.get("/{client_id}", response_model=dict)
@@ -113,16 +107,13 @@ async def get_client(client_id: int, db: Session = Depends(get_db)):
                     "status": p.status,
                 }
                 for p in projects
-            ]
-        }
+            ],
+        },
     }
 
 
 @router.get("/{client_id}/projects", response_model=dict)
-async def get_client_projects(
-    client_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_client_projects(client_id: int, db: Session = Depends(get_db)):
     """获取客户的项目列表"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
@@ -144,7 +135,7 @@ async def get_client_projects(
                 "created_at": p.created_at.isoformat() if p.created_at else None,
             }
             for p in projects
-        ]
+        ],
     }
 
 
@@ -170,7 +161,7 @@ async def create_client(data: dict, db: Session = Depends(get_db)):
             industry=data.get("industry"),
             address=data.get("address"),
             description=data.get("description"),
-            status=data.get("status", 1)
+            status=data.get("status", 1),
         )
         db.add(client)
         db.commit()
@@ -186,11 +177,7 @@ async def create_client(data: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/{client_id}", response_model=ApiResponse)
-async def update_client(
-    client_id: int,
-    data: dict,
-    db: Session = Depends(get_db)
-):
+async def update_client(client_id: int, data: dict, db: Session = Depends(get_db)):
     """更新客户信息"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
@@ -260,24 +247,13 @@ async def get_stats(db: Session = Depends(get_db)):
 
     return {
         "success": True,
-        "data": {
-            "total": total,
-            "active": active,
-            "inactive": total - active,
-            "industry_distribution": industry_dist
-        }
+        "data": {"total": total, "active": active, "inactive": total - active, "industry_distribution": industry_dist},
     }
 
 
 @router.get("/indicators/list", response_model=dict)
 async def get_indicators(db: Session = Depends(get_db)):
     """获取客户行业列表（用于筛选）"""
-    industries = db.query(Client.industry).filter(
-        Client.industry.isnot(None),
-        Client.industry != ""
-    ).distinct().all()
+    industries = db.query(Client.industry).filter(Client.industry.isnot(None), Client.industry != "").distinct().all()
 
-    return {
-        "success": True,
-        "data": [ind[0] for ind in industries if ind[0]]
-    }
+    return {"success": True, "data": [ind[0] for ind in industries if ind[0]]}

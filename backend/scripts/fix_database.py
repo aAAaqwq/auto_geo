@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 from loguru import logger
 
+
 def check_and_fix_database():
     """
     检查并修复数据库表结构
@@ -17,7 +18,7 @@ def check_and_fix_database():
     # 注意：根据原逻辑 BASE_DIR 是 parent.parent，即 backend/
     # 数据库路径是 BASE_DIR / "database" / "auto_geo_v3.db"
     # 即 backend/database/auto_geo_v3.db
-    
+
     current_file = Path(__file__).resolve()
     # 如果作为模块导入，路径计算方式不变
     BASE_DIR = current_file.parent.parent
@@ -37,10 +38,10 @@ def check_and_fix_database():
         # 检查geo_articles表结构
         cursor.execute("PRAGMA table_info(geo_articles)")
         columns = cursor.fetchall()
-        
+
         # 获取现有列名列表
         existing_columns = [col[1] for col in columns]
-        
+
         # 定义需要检查的列及其定义
         columns_to_check = [
             ("publish_time", "DATETIME"),
@@ -54,7 +55,7 @@ def check_and_fix_database():
             ("error_msg", "TEXT"),
             ("publish_logs", "TEXT"),
             ("platform_url", "TEXT"),
-            ("index_status", "TEXT DEFAULT 'uncheck'")
+            ("index_status", "TEXT DEFAULT 'uncheck'"),
         ]
 
         for col_name, col_def in columns_to_check:
@@ -79,11 +80,12 @@ def check_and_fix_database():
         # 关闭连接
         conn.close()
 
+
 if __name__ == "__main__":
     # 配置 logger 输出到控制台
     import sys
+
     logger.remove()
     logger.add(sys.stdout, level="INFO")
-    
-    check_and_fix_database()
 
+    check_and_fix_database()

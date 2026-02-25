@@ -26,7 +26,7 @@ async def research_zhihu_elements():
     try:
         # 获取账号
         db = SessionLocal()
-        account = db.query(Account).filter(Account.platform == 'zhihu').first()
+        account = db.query(Account).filter(Account.platform == "zhihu").first()
         if not account:
             logger.error("❌ 没有知乎账号")
             db.close()
@@ -40,6 +40,7 @@ async def research_zhihu_elements():
         playwright = await async_playwright().start()
 
         import os
+
         chrome_paths = [
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -82,7 +83,7 @@ async def research_zhihu_elements():
         page = await context.new_page()
 
         # 访问发布页面
-        await page.goto(PLATFORMS['zhihu']['publish_url'], timeout=60000, wait_until="domcontentloaded")
+        await page.goto(PLATFORMS["zhihu"]["publish_url"], timeout=60000, wait_until="domcontentloaded")
         await asyncio.sleep(5)
 
         current_url = page.url
@@ -97,9 +98,9 @@ async def research_zhihu_elements():
         # ==================== 研究各种元素 ====================
 
         # 1. 封面上传元素
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究1: 封面图片上传元素")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         cover_elements = await page.evaluate("""
             () => {
@@ -125,9 +126,9 @@ async def research_zhihu_elements():
         logger.info(f"封面上传相关元素: {json.dumps(cover_elements, indent=2, ensure_ascii=False)}")
 
         # 2. 创作声明元素
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究2: 创作声明（AI辅助）元素")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         declaration_elements = await page.evaluate("""
             () => {
@@ -156,9 +157,9 @@ async def research_zhihu_elements():
         logger.info(f"创作声明相关元素: {json.dumps(declaration_elements[:20], indent=2, ensure_ascii=False)}")
 
         # 3. 话题选择元素
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究3: 话题选择元素")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         topic_elements = await page.evaluate("""
             () => {
@@ -184,9 +185,9 @@ async def research_zhihu_elements():
         logger.info(f"话题选择相关元素: {json.dumps(topic_elements, indent=2, ensure_ascii=False)}")
 
         # 4. 富文本编辑器研究
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究4: 富文本编辑器")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         editor_info = await page.evaluate("""
             () => {
@@ -211,9 +212,9 @@ async def research_zhihu_elements():
         logger.info(f"编辑器信息: {json.dumps(editor_info, indent=2, ensure_ascii=False)}")
 
         # 5. 发布按钮及其周边元素
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究5: 发布按钮及周边")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         publish_area = await page.evaluate("""
             () => {
@@ -237,9 +238,9 @@ async def research_zhihu_elements():
         logger.info(f"发布按钮: {json.dumps(publish_area, indent=2, ensure_ascii=False)}")
 
         # 6. 查找所有checkbox和radio（可能用于创作声明）
-        logger.info("\n" + "="*50)
+        logger.info("\n" + "=" * 50)
         logger.info("研究6: 复选框和单选框")
-        logger.info("="*50)
+        logger.info("=" * 50)
 
         checkboxes = await page.evaluate("""
             () => {
@@ -280,6 +281,7 @@ async def research_zhihu_elements():
     except Exception as e:
         logger.error(f"❌ 研究失败: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
         return False
 

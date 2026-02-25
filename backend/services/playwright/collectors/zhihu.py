@@ -40,28 +40,28 @@ class ZhihuCollector(BaseCollector):
             # 1. 导航到搜索页
             search_url = f"https://www.zhihu.com/search?type=content&q={keyword}"
             await page.goto(search_url, wait_until="networkidle")
-            
+
             # 从配置中获取最大页数，默认3页
             max_pages = self.config.get("max_pages", 3)
-            
+
             for current_page in range(1, max_pages + 1):
                 logger.info(f"[知乎] 正在搜索第 {current_page} 页...")
-                
+
                 # 模拟真人阅读延时
                 await self._random_sleep(2, 4)
                 await self._handle_login_popup(page)
-                
+
                 # 2. 模拟真人滚动加载
                 await self._human_scroll(page)
 
                 # 3. 提取当前页搜索结果
                 page_articles = await self._extract_search_results(page)
-                
+
                 # 去重合并
                 for art in page_articles:
-                    if not any(a['url'] == art['url'] for a in all_articles):
+                    if not any(a["url"] == art["url"] for a in all_articles):
                         all_articles.append(art)
-                
+
                 logger.info(f"[知乎] 第 {current_page} 页搜索完成，当前累计: {len(all_articles)} 篇")
 
                 # 4. 寻找并点击“下一页”
@@ -76,7 +76,7 @@ class ZhihuCollector(BaseCollector):
                     else:
                         logger.info("[知乎] 未发现更多页码或按钮，停止翻页")
                         break
-            
+
             return all_articles
 
         except Exception as e:
@@ -95,19 +95,19 @@ class ZhihuCollector(BaseCollector):
             # 1. 导航到搜索页
             search_url = f"https://www.zhihu.com/search?type=content&q={keyword}"
             await page.goto(search_url, wait_until="networkidle")
-            
+
             max_pages = self.config.get("max_pages", 3)
-            
+
             for current_page in range(1, max_pages + 1):
                 logger.info(f"[知乎] 正在处理第 {current_page} 页...")
-                
+
                 await self._random_sleep(2, 4)
                 await self._handle_login_popup(page)
                 await self._human_scroll(page)
 
                 # 提取当前页结果
                 page_articles = await self._extract_search_results(page)
-                
+
                 # 立即筛选并提取正文
                 trending_in_page = self._filter_trending(page_articles)
                 logger.info(f"[知乎] 第 {current_page} 页筛选出 {len(trending_in_page)} 篇爆火文章")
@@ -115,22 +115,24 @@ class ZhihuCollector(BaseCollector):
                 for article in trending_in_page:
                     if any(a.url == article["url"] for a in all_collected):
                         continue
-                        
+
                     content = await self.extract_content(page, article["url"])
                     if content:
-                        all_collected.append(CollectedArticle(
-                            title=article.get("title", ""),
-                            url=article.get("url", ""),
-                            content=content,
-                            likes=article.get("likes", 0),
-                            reads=article.get("reads", 0),
-                            comments=article.get("comments", 0),
-                            author=article.get("author", ""),
-                            platform=self.platform_id,
-                            publish_time=article.get("publish_time", "")
-                        ))
+                        all_collected.append(
+                            CollectedArticle(
+                                title=article.get("title", ""),
+                                url=article.get("url", ""),
+                                content=content,
+                                likes=article.get("likes", 0),
+                                reads=article.get("reads", 0),
+                                comments=article.get("comments", 0),
+                                author=article.get("author", ""),
+                                platform=self.platform_id,
+                                publish_time=article.get("publish_time", ""),
+                            )
+                        )
                         await self._random_sleep(1, 3)
-                    
+
                     # 提取完后必须切回搜索结果页
                     if page.url != search_url:
                         await page.goto(search_url, wait_until="networkidle")
@@ -148,7 +150,7 @@ class ZhihuCollector(BaseCollector):
                         search_url = page.url
                     else:
                         break
-            
+
             return all_collected
 
         except Exception as e:
@@ -198,14 +200,16 @@ class ZhihuCollector(BaseCollector):
                         author = await author_elem.text_content()
 
                     if title and href:
-                        articles.append({
-                            "title": title.strip(),
-                            "url": href,
-                            "likes": likes,
-                            "reads": likes * 50,  # 知乎没有直接显示阅读量，用点赞估算
-                            "comments": comments,
-                            "author": author.strip() if author else "",
-                        })
+                        articles.append(
+                            {
+                                "title": title.strip(),
+                                "url": href,
+                                "likes": likes,
+                                "reads": likes * 50,  # 知乎没有直接显示阅读量，用点赞估算
+                                "comments": comments,
+                                "author": author.strip() if author else "",
+                            }
+                        )
 
                 except Exception as e:
                     logger.debug(f"[知乎] 提取单条结果失败: {e}")
@@ -221,13 +225,13 @@ class ZhihuCollector(BaseCollector):
         try:
             logger.info(f"[知乎] 正在提取正文: {url}")
             await page.goto(url, wait_until="networkidle")
-            
+
             # 增加随机延时，模拟真人阅读
             await self._random_sleep(2, 5)
 
             # 检测并处理登录弹窗
             await self._handle_login_popup(page)
-            
+
             # 尝试从 SELECTORS 中定义的多个选择器提取
             selectors = self.SELECTORS["content_body"].split(", ")
 
@@ -269,18 +273,18 @@ class ZhihuCollector(BaseCollector):
         text = text.strip().lower()
 
         # 移除非数字字符但保留k、w、万
-        match = re.search(r'([\d.]+)\s*([kwm万])?', text)
+        match = re.search(r"([\d.]+)\s*([kwm万])?", text)
         if not match:
             return 0
 
         num = float(match.group(1))
         unit = match.group(2)
 
-        if unit in ['k', 'K']:
+        if unit in ["k", "K"]:
             num *= 1000
-        elif unit in ['w', 'W', '万']:
+        elif unit in ["w", "W", "万"]:
             num *= 10000
-        elif unit in ['m', 'M']:
+        elif unit in ["m", "M"]:
             num *= 1000000
 
         return int(num)

@@ -47,13 +47,7 @@ class AIPlatformChecker(ABC):
             **kwargs: 额外的上下文信息
         """
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = {
-            "timestamp": timestamp,
-            "platform": self.name,
-            "level": level,
-            "message": message,
-            **kwargs
-        }
+        log_entry = {"timestamp": timestamp, "platform": self.name, "level": level, "message": message, **kwargs}
         self.operation_log.append(log_entry)
 
         if level == "info":
@@ -66,11 +60,7 @@ class AIPlatformChecker(ABC):
             logger.debug(f"[{self.name}] {message}")
 
     async def _retry_operation(
-        self,
-        operation,
-        operation_name: str,
-        max_retries: int = None,
-        retry_delay: int = None
+        self, operation, operation_name: str, max_retries: int = None, retry_delay: int = None
     ) -> Dict[str, Any]:
         """
         通用重试机制
@@ -118,19 +108,10 @@ class AIPlatformChecker(ABC):
                     self._log("info", f"等待 {delay:.2f} 秒后进行第 {attempt + 1} 次重试")
                     await asyncio.sleep(delay)
 
-        return {
-            "success": False,
-            "error_msg": last_error or f"操作失败，已重试 {max_retries} 次"
-        }
+        return {"success": False, "error_msg": last_error or f"操作失败，已重试 {max_retries} 次"}
 
     @abstractmethod
-    async def check(
-        self,
-        page: Page,
-        question: str,
-        keyword: str,
-        company: str
-    ) -> Dict[str, Any]:
+    async def check(self, page: Page, question: str, keyword: str, company: str) -> Dict[str, Any]:
         """
         检测AI平台收录情况
 
@@ -165,25 +146,25 @@ class AIPlatformChecker(ABC):
 
             # 使用更灵活的等待策略
             await page.goto(
-                self.url, 
+                self.url,
                 wait_until="domcontentloaded",  # 改为domcontentloaded，显著加快速度
-                timeout=60000
+                timeout=60000,
             )
 
             # 智能等待关键元素，替代死等
             # 尝试等待输入框、聊天区域或登录按钮
             try:
                 await page.wait_for_selector(
-                    "textarea, input[type='text'], [contenteditable='true'], [class*='chat'], [class*='login'], button", 
+                    "textarea, input[type='text'], [contenteditable='true'], [class*='chat'], [class*='login'], button",
                     timeout=8000,
-                    state="visible"
+                    state="visible",
                 )
             except Exception:
                 # 即使超时也不报错，继续后续检查
                 pass
-            
+
             self._log("info", f"页面加载完成: {self.name}")
-            
+
             # 检查是否需要登录（通过检测常见的登录元素）
             login_indicators = [
                 "[class*='login']",
@@ -193,9 +174,9 @@ class AIPlatformChecker(ABC):
                 "button:has-text('登录')",
                 "button:has-text('Sign in')",
                 "text='登录'",
-                "text='Sign in'"
+                "text='Sign in'",
             ]
-            
+
             has_login = False
             for indicator in login_indicators:
                 try:
@@ -206,7 +187,7 @@ class AIPlatformChecker(ABC):
                         break
                 except Exception:
                     continue
-            
+
             if has_login:
                 self._log("info", "检测到登录页面，请手动完成登录")
                 # 给用户30秒时间完成登录
@@ -219,12 +200,7 @@ class AIPlatformChecker(ABC):
             self._log("error", f"导航失败: {e}")
             return False
 
-    async def wait_for_selector(
-        self,
-        page: Page,
-        selectors: List[str],
-        timeout: int = 20000
-    ) -> tuple:
+    async def wait_for_selector(self, page: Page, selectors: List[str], timeout: int = 20000) -> tuple:
         """
         增强的智能等待选择器出现（支持多个备选选择器）
         优化：并行等待所有选择器，而不是分批次
@@ -249,9 +225,9 @@ class AIPlatformChecker(ABC):
             "[class*='user-input']",
             "[class*='chat-box']",
             "[id*='input']",
-            "[name*='input']"
+            "[name*='input']",
         ]
-        
+
         # 去重
         unique_selectors = []
         seen = set()
@@ -259,7 +235,7 @@ class AIPlatformChecker(ABC):
             if s not in seen:
                 unique_selectors.append(s)
                 seen.add(s)
-        
+
         # 1. 快速检查是否已经存在
         for selector in unique_selectors:
             try:
@@ -269,21 +245,17 @@ class AIPlatformChecker(ABC):
                     return True, selector
             except Exception:
                 continue
-                
+
         # 2. 并行等待策略
         # 创建一个复合选择器，用逗号分隔，这样只要任意一个出现就会触发
         # Playwright 支持逗号分隔的选择器列表
         combined_selector = ", ".join(unique_selectors)
-        
+
         try:
             self._log("debug", "尝试并行等待选择器组合")
             # 等待任意一个选择器出现
-            element = await page.wait_for_selector(
-                combined_selector, 
-                state="visible", 
-                timeout=timeout
-            )
-            
+            element = await page.wait_for_selector(combined_selector, state="visible", timeout=timeout)
+
             if element:
                 # 找出具体是哪个选择器匹配了（反向查找略复杂，这里只要确认匹配即可）
                 # 为了返回具体的selector，我们再次遍历检查哪个是可见的
@@ -295,15 +267,15 @@ class AIPlatformChecker(ABC):
                             return True, selector
                     except Exception:
                         continue
-                
+
                 # 如果找不到具体的，就返回组合选择器或第一个
                 self._log("info", "选择器组合匹配成功")
                 return True, unique_selectors[0]
-                
+
         except Exception as e:
             elapsed_time = (time.time() - start_time) * 1000
             self._log("warning", f"等待选择器超时或失败: {e}, 耗时: {elapsed_time:.0f}ms")
-            
+
             # 最后的兜底策略：查找任意可见的 textarea 或 contenteditable
             # 这可以解决因页面更新导致特定选择器失效的问题
             try:
@@ -338,13 +310,13 @@ class AIPlatformChecker(ABC):
                     }
                     return null;
                 }""")
-                
+
                 if fallback_selector:
                     self._log("info", f"兜底策略成功，找到输入框: {fallback_selector}")
                     return True, fallback_selector
             except Exception as fallback_e:
                 self._log("warning", f"兜底策略失败: {fallback_e}")
-            
+
             return False, None
 
         return False, None
@@ -355,7 +327,7 @@ class AIPlatformChecker(ABC):
         initial_content: str,
         selector: str = "body",
         timeout: int = 60000,
-        check_interval: float = 1.0
+        check_interval: float = 1.0,
     ) -> Dict[str, Any]:
         """
         增强的智能等待AI回答生成完成
@@ -376,7 +348,7 @@ class AIPlatformChecker(ABC):
         last_content = initial_content
         stable_count = 0
         required_stable_checks = 5  # 增加稳定检查次数，防止回答还在生成中就截断
-        min_content_length = 100    # 增加最小内容长度要求
+        min_content_length = 100  # 增加最小内容长度要求
 
         while (time.time() - start_time) < timeout / 1000:
             try:
@@ -405,7 +377,7 @@ class AIPlatformChecker(ABC):
                             "success": True,
                             "content_length": content_length,
                             "elapsed_time": elapsed_time,
-                            "stable": True
+                            "stable": True,
                         }
 
                     await asyncio.sleep(check_interval)
@@ -427,14 +399,10 @@ class AIPlatformChecker(ABC):
             "success": content_length > min_content_length,
             "content_length": content_length,
             "elapsed_time": elapsed_time,
-            "stable": stable_count >= required_stable_checks
+            "stable": stable_count >= required_stable_checks,
         }
 
-    async def get_answer_content(
-        self,
-        page: Page,
-        question: str
-    ) -> Dict[str, Any]:
+    async def get_answer_content(self, page: Page, question: str) -> Dict[str, Any]:
         """
         增强的获取AI回答内容
 
@@ -456,7 +424,7 @@ class AIPlatformChecker(ABC):
             ".markdown-body",
             "[class*='response']",
             "[class*='result']",
-            "[class*='content-body']"
+            "[class*='content-body']",
         ]
 
         answer_text = ""
@@ -499,57 +467,85 @@ class AIPlatformChecker(ABC):
 
             # 获取页面所有文本
             page_text = await page.inner_text("body")
-            
+
             # 分割成行
-            lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-            
+            lines = [line.strip() for line in page_text.split("\n") if line.strip()]
+
             # 过滤掉常见的菜单和无关内容
             ignored_keywords = [
-                "AI回答", "豆包", "新对话", "帮我写作", "AI 创作", "云盘", "更多", "历史对话",
-                "登录", "注册", "关于", "帮助", "设置", "退出", "反馈", "Terms", "Privacy",
-                "最近对话", "对话分组", "我的空间", "手机版", "下载", "APP", "智能体", "发现",
-                "深度思考", "联网搜索", "重新生成", "复制", "点赞", "点踩", "分享"
+                "AI回答",
+                "豆包",
+                "新对话",
+                "帮我写作",
+                "AI 创作",
+                "云盘",
+                "更多",
+                "历史对话",
+                "登录",
+                "注册",
+                "关于",
+                "帮助",
+                "设置",
+                "退出",
+                "反馈",
+                "Terms",
+                "Privacy",
+                "最近对话",
+                "对话分组",
+                "我的空间",
+                "手机版",
+                "下载",
+                "APP",
+                "智能体",
+                "发现",
+                "深度思考",
+                "联网搜索",
+                "重新生成",
+                "复制",
+                "点赞",
+                "点踩",
+                "分享",
             ]
-            
+
             potential_answers = []
             current_block = []
-            
+
             for line in lines:
                 # 过滤极短行
                 if len(line) < 5:
                     continue
-                    
+
                 is_ignored = False
                 # 只有短行才检查忽略关键词，防止误伤长文中的正常词汇
-                if len(line) < 100:  
+                if len(line) < 100:
                     for keyword in ignored_keywords:
                         if keyword in line:
                             is_ignored = True
                             break
-                
+
                 if is_ignored:
                     # 如果遇到忽略词，仅跳过该行，不要轻易打断当前文本块
                     # 除非连续遇到多个忽略行，或者忽略行具有明显的分割性质（如"新对话"）
                     # 这里简化处理：直接跳过，尽可能合并上下文
                     continue
-                    
+
                 # 过滤掉包含问题的行（避免把问题当成回答）
                 if question in line:
                     continue
-                
+
                 # 将连续的非忽略行视为一个块
                 current_block.append(line)
-            
+
             # 添加最后一个块
             if current_block:
                 potential_answers.append("\n".join(current_block))
-            
+
             # 尝试寻找最长的一段文本
             # 改进：排除看起来像侧边栏菜单的块（多行且每行都很短）
             longest_block = ""
             for block in potential_answers:
                 # 检查是否为疑似菜单/侧边栏
-                lines_in_block = block.split('\n')
+                lines_in_block = block.split("\n")
                 if len(lines_in_block) > 5:
                     # 计算平均行长
                     avg_len = sum(len(l) for l in lines_in_block) / len(lines_in_block)
@@ -560,7 +556,7 @@ class AIPlatformChecker(ABC):
 
                 if len(block) > len(longest_block):
                     longest_block = block
-            
+
             if len(longest_block) > 100:
                 answer_text = longest_block
                 matched_selector = "body-text-filtered"
@@ -572,23 +568,13 @@ class AIPlatformChecker(ABC):
                 "success": True,
                 "answer": answer_text[:5000],
                 "selector": matched_selector,
-                "length": len(answer_text)
+                "length": len(answer_text),
             }
         else:
             self._log("warning", "未能获取到回答内容")
-            return {
-                "success": False,
-                "answer": "",
-                "selector": None,
-                "length": 0
-            }
+            return {"success": False, "answer": "", "selector": None, "length": 0}
 
-    def check_keywords_in_text(
-        self,
-        text: str,
-        keyword: str,
-        company: str
-    ) -> Dict[str, Any]:
+    def check_keywords_in_text(self, text: str, keyword: str, company: str) -> Dict[str, Any]:
         """
         检查文本中是否包含关键词和公司名
 
@@ -603,11 +589,11 @@ class AIPlatformChecker(ABC):
         self._log("info", f"开始关键词检测, 文本长度: {len(text)}")
 
         import re
-        
+
         def clean_str(s: str) -> str:
             # 统一清理逻辑：替换非字字符为空格，合并空格，转小写
-            s = re.sub(r'[^\w\s\u4e00-\u9fa5]', ' ', s)
-            s = re.sub(r'\s+', ' ', s).strip()
+            s = re.sub(r"[^\w\s\u4e00-\u9fa5]", " ", s)
+            s = re.sub(r"\s+", " ", s).strip()
             return s.lower()
 
         text_lower = clean_str(text)
@@ -626,7 +612,7 @@ class AIPlatformChecker(ABC):
             "company_found": company_count > 0,
             "company_count": company_count,
             "confidence": 0.0,
-            "reason": ""
+            "reason": "",
         }
 
         if keyword_count > 0:
@@ -642,9 +628,12 @@ class AIPlatformChecker(ABC):
         if len(text) < 100 and keyword_count > 0:
             result["confidence"] = min(result["confidence"] + 0.1, 0.85)
 
-        self._log("info", f"关键词检测完成: 关键词={result['keyword_found']}({keyword_count}次), "
-                         f"公司={result['company_found']}({company_count}次), "
-                         f"置信度={result['confidence']:.2f}")
+        self._log(
+            "info",
+            f"关键词检测完成: 关键词={result['keyword_found']}({keyword_count}次), "
+            f"公司={result['company_found']}({company_count}次), "
+            f"置信度={result['confidence']:.2f}",
+        )
 
         return result
 
@@ -663,7 +652,7 @@ class AIPlatformChecker(ABC):
                 "[class*='new-conversation']",
                 "[class*='clear-history']",
                 "button[title*='新对话']",
-                "[class*='refresh'] button"
+                "[class*='refresh'] button",
             ]
 
             for selector in clear_selectors:
@@ -705,28 +694,24 @@ class AIPlatformChecker(ABC):
         self.operation_log.clear()
 
     async def submit_question(
-        self,
-        page: Page,
-        question: str,
-        input_selector: str,
-        submit_button_selector: str = None
+        self, page: Page, question: str, input_selector: str, submit_button_selector: str = None
     ) -> bool:
         """
         稳健的提问提交方法
         优化：优先使用模拟键盘输入，解决React/Vue组件状态同步问题
-        
+
         Args:
             page: Playwright页面对象
             question: 问题内容
             input_selector: 输入框选择器
             submit_button_selector: 提交按钮选择器（可选）
-            
+
         Returns:
             是否成功提交
         """
         try:
             self._log("info", f"开始输入问题，长度: {len(question)}")
-            
+
             # 1. 聚焦并点击输入框 (确保激活)
             try:
                 await page.focus(input_selector)
@@ -734,44 +719,50 @@ class AIPlatformChecker(ABC):
                 await asyncio.sleep(0.5)
             except Exception as e:
                 self._log("warning", f"聚焦/点击输入框失败: {e}")
-            
+
             # 2. 模拟真实键盘输入 (最稳健的方式)
             # 避免使用 fill，因为它可能不会触发某些前端框架的 change 事件
             try:
                 # 先尝试清空内容 (如果是 input/textarea)
-                await page.evaluate("""(selector) => {
+                await page.evaluate(
+                    """(selector) => {
                     const el = document.querySelector(selector);
                     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
                         el.value = '';
                     } else if (el) {
                         el.innerText = '';
                     }
-                }""", input_selector)
-                
+                }""",
+                    input_selector,
+                )
+
                 # 模拟打字
                 await page.keyboard.type(question, delay=30)
-                
+
             except Exception as e:
                 self._log("error", f"模拟输入失败: {e}")
                 return False
-                
+
             # 3. 验证输入结果
-            input_value = await page.evaluate("""(selector) => {
+            input_value = await page.evaluate(
+                """(selector) => {
                 const el = document.querySelector(selector);
                 if (!el) return null;
                 return el.value || el.innerText || el.textContent;
-            }""", input_selector)
-            
+            }""",
+                input_selector,
+            )
+
             if not input_value or len(input_value.strip()) == 0:
                 self._log("warning", "检测到输入框为空，尝试使用 fill 作为回退方案")
                 await page.fill(input_selector, question)
-            
+
             await asyncio.sleep(0.5)
             self._log("info", "问题输入完成，准备提交")
-            
+
             # 4. 提交
             submitted = False
-            
+
             # 方案A: 点击发送按钮 (如果存在且可见)
             if submit_button_selector:
                 try:
@@ -783,14 +774,14 @@ class AIPlatformChecker(ABC):
                         submitted = True
                 except Exception:
                     self._log("debug", "发送按钮不可用或未找到")
-            
+
             # 方案B: 回车提交
             if not submitted:
                 self._log("info", "使用回车键提交")
                 await page.press(input_selector, "Enter")
-                
+
             return True
-            
+
         except Exception as e:
             self._log("error", f"提问提交失败: {e}")
             return False

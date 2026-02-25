@@ -16,6 +16,7 @@ from backend.database.models import Project, Keyword, IndexCheckRecord
 @dataclass
 class AlertRule:
     """预警规则"""
+
     name: str
     threshold: float
     enabled: bool = True
@@ -45,7 +46,7 @@ class NotificationService:
         self.db = db
         self.channels = []  # 通知渠道列表
 
-    def add_channel(self, channel: 'NotificationChannel'):
+    def add_channel(self, channel: "NotificationChannel"):
         """添加通知渠道"""
         self.channels.append(channel)
         logger.info(f"添加通知渠道: {channel.name}")
@@ -72,10 +73,7 @@ class NotificationService:
 
         for project in projects:
             # 检查每个关键词
-            keywords = self.db.query(Keyword).filter(
-                Keyword.project_id == project.id,
-                Keyword.status == "active"
-            ).all()
+            keywords = self.db.query(Keyword).filter(Keyword.project_id == project.id, Keyword.status == "active").all()
 
             for keyword in keywords:
                 # 检查各种预警规则
@@ -88,32 +86,31 @@ class NotificationService:
 
         return alerts
 
-    async def _check_keyword_alerts(
-        self,
-        keyword: Keyword,
-        project: Project
-    ) -> List[Dict[str, Any]]:
+    async def _check_keyword_alerts(self, keyword: Keyword, project: Project) -> List[Dict[str, Any]]:
         """检查单个关键词的预警"""
         alerts = []
 
         # 获取最近的检测记录（最近7天）
         seven_days_ago = datetime.now() - timedelta(days=7)
-        records = self.db.query(IndexCheckRecord).filter(
-            IndexCheckRecord.keyword_id == keyword.id,
-            IndexCheckRecord.check_time >= seven_days_ago
-        ).all()
+        records = (
+            self.db.query(IndexCheckRecord)
+            .filter(IndexCheckRecord.keyword_id == keyword.id, IndexCheckRecord.check_time >= seven_days_ago)
+            .all()
+        )
 
         if not records:
             # 没有检测记录
-            alerts.append({
-                "type": "no_data",
-                "level": "warning",
-                "keyword": keyword.keyword,
-                "project": project.name,
-                "company": project.company_name,
-                "message": f"关键词 '{keyword.keyword}' 最近7天没有检测数据",
-                "timestamp": datetime.now().isoformat()
-            })
+            alerts.append(
+                {
+                    "type": "no_data",
+                    "level": "warning",
+                    "keyword": keyword.keyword,
+                    "project": project.name,
+                    "company": project.company_name,
+                    "message": f"关键词 '{keyword.keyword}' 最近7天没有检测数据",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             return alerts
 
         # 计算命中率
@@ -124,37 +121,42 @@ class NotificationService:
 
         # 检查命中率过低
         if self.ALERT_RULES["hit_rate_drop"].enabled and hit_rate < self.ALERT_RULES["hit_rate_drop"].threshold:
-            alerts.append({
-                "type": "hit_rate_low",
-                "level": "warning" if hit_rate > 10 else "critical",
-                "keyword": keyword.keyword,
-                "project": project.name,
-                "company": project.company_name,
-                "hit_rate": round(hit_rate, 2),
-                "message": f"关键词 '{keyword.keyword}' 命中率仅为 {hit_rate:.1f}%，低于阈值 {self.ALERT_RULES['hit_rate_drop'].threshold}%",
-                "timestamp": datetime.now().isoformat()
-            })
+            alerts.append(
+                {
+                    "type": "hit_rate_low",
+                    "level": "warning" if hit_rate > 10 else "critical",
+                    "keyword": keyword.keyword,
+                    "project": project.name,
+                    "company": project.company_name,
+                    "hit_rate": round(hit_rate, 2),
+                    "message": f"关键词 '{keyword.keyword}' 命中率仅为 {hit_rate:.1f}%，低于阈值 {self.ALERT_RULES['hit_rate_drop'].threshold}%",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
         # 检查零收录
         if self.ALERT_RULES["no_index"].enabled and hit_rate == 0:
-            alerts.append({
-                "type": "no_index",
-                "level": "critical",
-                "keyword": keyword.keyword,
-                "project": project.name,
-                "company": project.company_name,
-                "message": f"关键词 '{keyword.keyword}' 在所有AI平台零收录！",
-                "timestamp": datetime.now().isoformat()
-            })
+            alerts.append(
+                {
+                    "type": "no_index",
+                    "level": "critical",
+                    "keyword": keyword.keyword,
+                    "project": project.name,
+                    "company": project.company_name,
+                    "message": f"关键词 '{keyword.keyword}' 在所有AI平台零收录！",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
         # 检查持续低迷
         if self.ALERT_RULES["consistently_low"].enabled:
             # 获取更长时间的数据（30天）
             thirty_days_ago = datetime.now() - timedelta(days=30)
-            long_term_records = self.db.query(IndexCheckRecord).filter(
-                IndexCheckRecord.keyword_id == keyword.id,
-                IndexCheckRecord.check_time >= thirty_days_ago
-            ).all()
+            long_term_records = (
+                self.db.query(IndexCheckRecord)
+                .filter(IndexCheckRecord.keyword_id == keyword.id, IndexCheckRecord.check_time >= thirty_days_ago)
+                .all()
+            )
 
             if long_term_records:
                 lt_total = len(long_term_records)
@@ -163,16 +165,18 @@ class NotificationService:
                 lt_hit_rate = (lt_keyword_found + lt_company_found) / (lt_total * 2) * 100
 
                 if lt_hit_rate < self.ALERT_RULES["consistently_low"].threshold:
-                    alerts.append({
-                        "type": "consistently_low",
-                        "level": "warning",
-                        "keyword": keyword.keyword,
-                        "project": project.name,
-                        "company": project.company_name,
-                        "hit_rate_30d": round(lt_hit_rate, 2),
-                        "message": f"关键词 '{keyword.keyword}' 30天命中率持续低迷（{lt_hit_rate:.1f}%）",
-                        "timestamp": datetime.now().isoformat()
-                    })
+                    alerts.append(
+                        {
+                            "type": "consistently_low",
+                            "level": "warning",
+                            "keyword": keyword.keyword,
+                            "project": project.name,
+                            "company": project.company_name,
+                            "hit_rate_30d": round(lt_hit_rate, 2),
+                            "message": f"关键词 '{keyword.keyword}' 30天命中率持续低迷（{lt_hit_rate:.1f}%）",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
         return alerts
 
@@ -211,24 +215,22 @@ class NotificationService:
             "critical_count": 0,
             "warning_count": 0,
             "alerts_by_type": {},
-            "recent_alerts": []
+            "recent_alerts": [],
         }
 
         for project in projects:
-            keywords = self.db.query(Keyword).filter(
-                Keyword.project_id == project.id,
-                Keyword.status == "active"
-            ).all()
+            keywords = self.db.query(Keyword).filter(Keyword.project_id == project.id, Keyword.status == "active").all()
 
             summary["total_keywords"] += len(keywords)
 
             for keyword in keywords:
                 # 简单检查当前状态
                 seven_days_ago = datetime.now() - timedelta(days=7)
-                records = self.db.query(IndexCheckRecord).filter(
-                    IndexCheckRecord.keyword_id == keyword.id,
-                    IndexCheckRecord.check_time >= seven_days_ago
-                ).all()
+                records = (
+                    self.db.query(IndexCheckRecord)
+                    .filter(IndexCheckRecord.keyword_id == keyword.id, IndexCheckRecord.check_time >= seven_days_ago)
+                    .all()
+                )
 
                 if records:
                     total = len(records)
@@ -247,6 +249,7 @@ class NotificationService:
 
 
 # ==================== 通知渠道 ====================
+
 
 class NotificationChannel:
     """通知渠道基类"""
@@ -269,10 +272,7 @@ class WebSocketNotificationChannel(NotificationChannel):
     async def send(self, alert: Dict[str, Any]):
         """通过WebSocket发送通知"""
         if self.ws_callback:
-            await self.ws_callback({
-                "type": "seo_alert",
-                "data": alert
-            })
+            await self.ws_callback({"type": "seo_alert", "data": alert})
 
 
 class LogNotificationChannel(NotificationChannel):
@@ -284,6 +284,7 @@ class LogNotificationChannel(NotificationChannel):
     async def send(self, alert: Dict[str, Any]):
         """记录到日志"""
         from loguru import logger
+
         logger.warning(f"[SEO预警] {alert['level'].upper()}: {alert['message']}")
 
 
@@ -313,20 +314,20 @@ class EmailNotificationChannel(NotificationChannel):
 
         subject = f"[SEO预警] {alert['level'].upper()}: {alert['project']} - {alert['keyword']}"
         body = f"""
-        预警类型: {alert['type']}
-        预警级别: {alert['level']}
-        项目: {alert.get('project', 'N/A')}
-        公司: {alert.get('company', 'N/A')}
-        关键词: {alert['keyword']}
-        描述: {alert['message']}
-        时间: {alert['timestamp']}
+        预警类型: {alert["type"]}
+        预警级别: {alert["level"]}
+        项目: {alert.get("project", "N/A")}
+        公司: {alert.get("company", "N/A")}
+        关键词: {alert["keyword"]}
+        描述: {alert["message"]}
+        时间: {alert["timestamp"]}
         """
 
         msg = MIMEMultipart()
-        msg['From'] = self.username
-        msg['To'] = ', '.join(self.recipients)
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+        msg["From"] = self.username
+        msg["To"] = ", ".join(self.recipients)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
 
         try:
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:

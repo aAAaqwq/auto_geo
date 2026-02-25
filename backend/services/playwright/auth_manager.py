@@ -16,7 +16,7 @@ class AuthManager:
             "zhihu": "https://www.zhihu.com/signin",
             "baijiahao": "https://baijiahao.baidu.com/",
             "toutiao": "https://mp.toutiao.com/",
-            "sohu": "https://mp.sohu.com/"
+            "sohu": "https://mp.sohu.com/",
         }
 
         target_url = urls.get(platform)

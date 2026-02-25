@@ -20,8 +20,10 @@ router = APIRouter(prefix="/api/knowledge", tags=["知识库管理"])
 
 # ==================== 请求/响应模型 ====================
 
+
 class KnowledgeCategoryCreate(BaseModel):
     """创建知识库分类请求"""
+
     name: str
     industry: Optional[str] = None
     description: Optional[str] = None
@@ -31,6 +33,7 @@ class KnowledgeCategoryCreate(BaseModel):
 
 class KnowledgeCategoryUpdate(BaseModel):
     """更新知识库分类请求"""
+
     name: Optional[str] = None
     industry: Optional[str] = None
     description: Optional[str] = None
@@ -40,6 +43,7 @@ class KnowledgeCategoryUpdate(BaseModel):
 
 class KnowledgeCategoryResponse(BaseModel):
     """知识库分类响应"""
+
     id: int
     name: str
     industry: Optional[str]
@@ -54,6 +58,7 @@ class KnowledgeCategoryResponse(BaseModel):
 
 class KnowledgeCreate(BaseModel):
     """创建知识条目请求"""
+
     category_id: int
     title: str
     content: str
@@ -62,6 +67,7 @@ class KnowledgeCreate(BaseModel):
 
 class KnowledgeUpdate(BaseModel):
     """更新知识条目请求"""
+
     title: Optional[str] = None
     content: Optional[str] = None
     type: Optional[str] = None
@@ -69,6 +75,7 @@ class KnowledgeUpdate(BaseModel):
 
 class KnowledgeResponse(BaseModel):
     """知识条目响应"""
+
     id: int
     category_id: int
     title: str
@@ -80,11 +87,9 @@ class KnowledgeResponse(BaseModel):
 
 # ==================== 知识库分类API ====================
 
+
 @router.get("/categories", response_model=List[KnowledgeCategoryResponse])
-async def get_categories(
-    search: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
+async def get_categories(search: Optional[str] = None, db: Session = Depends(get_db)):
     """
     获取知识库分类列表
 
@@ -99,9 +104,9 @@ async def get_categories(
 
     if search:
         query = query.filter(
-            (KnowledgeCategory.name.like(f"%{search}%")) |
-            (KnowledgeCategory.industry.like(f"%{search}%")) |
-            (KnowledgeCategory.tags.like(f"%{search}%"))
+            (KnowledgeCategory.name.like(f"%{search}%"))
+            | (KnowledgeCategory.industry.like(f"%{search}%"))
+            | (KnowledgeCategory.tags.like(f"%{search}%"))
         )
 
     categories = query.order_by(KnowledgeCategory.updated_at.desc()).all()
@@ -109,39 +114,37 @@ async def get_categories(
     result = []
     for cat in categories:
         # 统计知识数量
-        knowledge_count = db.query(Knowledge).filter(
-            Knowledge.category_id == cat.id,
-            Knowledge.status == 1
-        ).count()
+        knowledge_count = db.query(Knowledge).filter(Knowledge.category_id == cat.id, Knowledge.status == 1).count()
 
         # 统计关联项目数（根据行业匹配）
         from backend.database.models import Project
-        project_count = db.query(Project).filter(
-            Project.industry == cat.industry,
-            Project.status == 1
-        ).count() if cat.industry else 0
 
-        result.append(KnowledgeCategoryResponse(
-            id=cat.id,
-            name=cat.name,
-            industry=cat.industry,
-            description=cat.description,
-            tags=cat.tags,
-            color=cat.color,
-            knowledge_count=knowledge_count,
-            project_count=project_count,
-            created_at=cat.created_at.isoformat() if cat.created_at else "",
-            updated_at=cat.updated_at.isoformat() if cat.updated_at else "",
-        ))
+        project_count = (
+            db.query(Project).filter(Project.industry == cat.industry, Project.status == 1).count()
+            if cat.industry
+            else 0
+        )
+
+        result.append(
+            KnowledgeCategoryResponse(
+                id=cat.id,
+                name=cat.name,
+                industry=cat.industry,
+                description=cat.description,
+                tags=cat.tags,
+                color=cat.color,
+                knowledge_count=knowledge_count,
+                project_count=project_count,
+                created_at=cat.created_at.isoformat() if cat.created_at else "",
+                updated_at=cat.updated_at.isoformat() if cat.updated_at else "",
+            )
+        )
 
     return result
 
 
 @router.post("/categories", response_model=ApiResponse)
-async def create_category(
-    data: KnowledgeCategoryCreate,
-    db: Session = Depends(get_db)
-):
+async def create_category(data: KnowledgeCategoryCreate, db: Session = Depends(get_db)):
     """
     创建知识库分类
 
@@ -172,11 +175,7 @@ async def create_category(
 
 
 @router.put("/categories/{category_id}", response_model=ApiResponse)
-async def update_category(
-    category_id: int,
-    data: KnowledgeCategoryUpdate,
-    db: Session = Depends(get_db)
-):
+async def update_category(category_id: int, data: KnowledgeCategoryUpdate, db: Session = Depends(get_db)):
     """
     更新知识库分类
 
@@ -189,9 +188,7 @@ async def update_category(
         更新结果
     """
     try:
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == category_id
-        ).first()
+        category = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == category_id).first()
 
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
@@ -218,10 +215,7 @@ async def update_category(
 
 
 @router.delete("/categories/{category_id}", response_model=ApiResponse)
-async def delete_category(
-    category_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_category(category_id: int, db: Session = Depends(get_db)):
     """
     删除知识库分类
 
@@ -233,9 +227,7 @@ async def delete_category(
         删除结果
     """
     try:
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == category_id
-        ).first()
+        category = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == category_id).first()
 
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
@@ -255,12 +247,9 @@ async def delete_category(
 
 # ==================== 知识条目API ====================
 
+
 @router.get("/categories/{category_id}/knowledge", response_model=List[KnowledgeResponse])
-async def get_knowledge_list(
-    category_id: int,
-    search: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
+async def get_knowledge_list(category_id: int, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
     获取指定分类的知识列表
 
@@ -272,16 +261,10 @@ async def get_knowledge_list(
     Returns:
         知识条目列表
     """
-    query = db.query(Knowledge).filter(
-        Knowledge.category_id == category_id,
-        Knowledge.status == 1
-    )
+    query = db.query(Knowledge).filter(Knowledge.category_id == category_id, Knowledge.status == 1)
 
     if search:
-        query = query.filter(
-            (Knowledge.title.like(f"%{search}%")) |
-            (Knowledge.content.like(f"%{search}%"))
-        )
+        query = query.filter((Knowledge.title.like(f"%{search}%")) | (Knowledge.content.like(f"%{search}%")))
 
     items = query.order_by(Knowledge.updated_at.desc()).all()
 
@@ -300,10 +283,7 @@ async def get_knowledge_list(
 
 
 @router.post("/knowledge", response_model=ApiResponse)
-async def create_knowledge(
-    data: KnowledgeCreate,
-    db: Session = Depends(get_db)
-):
+async def create_knowledge(data: KnowledgeCreate, db: Session = Depends(get_db)):
     """
     创建知识条目
 
@@ -316,9 +296,7 @@ async def create_knowledge(
     """
     try:
         # 验证分类存在
-        category = db.query(KnowledgeCategory).filter(
-            KnowledgeCategory.id == data.category_id
-        ).first()
+        category = db.query(KnowledgeCategory).filter(KnowledgeCategory.id == data.category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
 
@@ -342,11 +320,7 @@ async def create_knowledge(
 
 
 @router.put("/knowledge/{knowledge_id}", response_model=ApiResponse)
-async def update_knowledge(
-    knowledge_id: int,
-    data: KnowledgeUpdate,
-    db: Session = Depends(get_db)
-):
+async def update_knowledge(knowledge_id: int, data: KnowledgeUpdate, db: Session = Depends(get_db)):
     """
     更新知识条目
 
@@ -359,9 +333,7 @@ async def update_knowledge(
         更新结果
     """
     try:
-        knowledge = db.query(Knowledge).filter(
-            Knowledge.id == knowledge_id
-        ).first()
+        knowledge = db.query(Knowledge).filter(Knowledge.id == knowledge_id).first()
 
         if not knowledge:
             raise HTTPException(status_code=404, detail="知识不存在")
@@ -384,10 +356,7 @@ async def update_knowledge(
 
 
 @router.delete("/knowledge/{knowledge_id}", response_model=ApiResponse)
-async def delete_knowledge(
-    knowledge_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_knowledge(knowledge_id: int, db: Session = Depends(get_db)):
     """
     删除知识条目
 
@@ -399,9 +368,7 @@ async def delete_knowledge(
         删除结果
     """
     try:
-        knowledge = db.query(Knowledge).filter(
-            Knowledge.id == knowledge_id
-        ).first()
+        knowledge = db.query(Knowledge).filter(Knowledge.id == knowledge_id).first()
 
         if not knowledge:
             raise HTTPException(status_code=404, detail="知识不存在")
@@ -419,10 +386,7 @@ async def delete_knowledge(
 
 
 @router.get("/knowledge/search", response_model=List[KnowledgeResponse])
-async def search_knowledge(
-    keyword: str = Query(..., min_length=1),
-    db: Session = Depends(get_db)
-):
+async def search_knowledge(keyword: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     """
     全局搜索知识
 
@@ -433,11 +397,15 @@ async def search_knowledge(
     Returns:
         知识条目列表
     """
-    items = db.query(Knowledge).filter(
-        Knowledge.status == 1,
-        (Knowledge.title.like(f"%{keyword}%")) |
-        (Knowledge.content.like(f"%{keyword}%"))
-    ).order_by(Knowledge.updated_at.desc()).limit(50).all()
+    items = (
+        db.query(Knowledge)
+        .filter(
+            Knowledge.status == 1, (Knowledge.title.like(f"%{keyword}%")) | (Knowledge.content.like(f"%{keyword}%"))
+        )
+        .order_by(Knowledge.updated_at.desc())
+        .limit(50)
+        .all()
+    )
 
     return [
         KnowledgeResponse(

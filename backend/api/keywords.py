@@ -21,8 +21,10 @@ router = APIRouter(prefix="/api/keywords", tags=["关键词管理"])
 
 # ==================== 请求/响应模型 ====================
 
+
 class ProjectCreate(BaseModel):
     """创建项目请求"""
+
     client_id: Optional[int] = None
     name: str
     company_name: str
@@ -33,6 +35,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectResponse(BaseModel):
     """项目响应"""
+
     id: int
     name: str
     company_name: str
@@ -48,6 +51,7 @@ class ProjectResponse(BaseModel):
 
 class KeywordCreate(BaseModel):
     """创建关键词请求"""
+
     project_id: int
     keyword: str
     difficulty_score: Optional[int] = None
@@ -55,6 +59,7 @@ class KeywordCreate(BaseModel):
 
 class KeywordResponse(BaseModel):
     """关键词响应"""
+
     id: int
     project_id: int
     keyword: str
@@ -69,6 +74,7 @@ class KeywordResponse(BaseModel):
 
 class QuestionVariantResponse(BaseModel):
     """问题变体响应"""
+
     id: int
     keyword_id: int
     question: str
@@ -80,6 +86,7 @@ class QuestionVariantResponse(BaseModel):
 
 class DistillRequest(BaseModel):
     """关键词蒸馏请求"""
+
     project_id: int
     # 通用版入参（对齐 n8n "AutoGeo-关键词蒸馏-通用版"）
     core_kw: Optional[str] = None
@@ -96,11 +103,13 @@ class DistillRequest(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     """生成问题变体请求"""
+
     keyword_id: int
     count: int = 3
 
 
 # ==================== 项目API ====================
+
 
 @router.get("/projects", response_model=List[ProjectResponse])
 async def list_projects(db: Session = Depends(get_db)):
@@ -119,7 +128,7 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
         domain_keyword=project_data.domain_keyword,
         description=project_data.description,
         industry=project_data.industry,
-        status=1
+        status=1,
     )
     db.add(project)
     db.commit()
@@ -166,15 +175,14 @@ async def get_project_keywords(project_id: int, db: Session = Depends(get_db)):
     🌟 [修复核心] 获取项目的所有关键词
     移除了严格的 status == "active" 过滤，确保所有导入的词都能显示
     """
-    keywords = db.query(Keyword).filter(
-        Keyword.project_id == project_id
-    ).order_by(Keyword.created_at.desc()).all()
+    keywords = db.query(Keyword).filter(Keyword.project_id == project_id).order_by(Keyword.created_at.desc()).all()
 
     logger.info(f"查询项目 {project_id} 的关键词，找到 {len(keywords)} 个结果")
     return keywords
 
 
 # ==================== 关键词业务API ====================
+
 
 @router.post("/distill", response_model=ApiResponse)
 async def distill_keywords(request: DistillRequest, db: Session = Depends(get_db)):
@@ -187,7 +195,11 @@ async def distill_keywords(request: DistillRequest, db: Session = Depends(get_db
 
     # 参数映射：优先使用通用版字段；否则从项目/旧字段推导
     core_kw = (request.core_kw or "").strip() or (project.domain_keyword or "").strip()
-    target_info = (request.target_info or "").strip() or (request.company_name or "").strip() or (project.company_name or "").strip()
+    target_info = (
+        (request.target_info or "").strip()
+        or (request.company_name or "").strip()
+        or (project.company_name or "").strip()
+    )
 
     result = await service.distill(
         core_kw=core_kw,
@@ -209,7 +221,7 @@ async def distill_keywords(request: DistillRequest, db: Session = Depends(get_db
         keyword = service.add_keyword(
             project_id=request.project_id,
             keyword=kw_data.get("keyword", ""),
-            difficulty_score=kw_data.get("difficulty_score")
+            difficulty_score=kw_data.get("difficulty_score"),
         )
         saved_keywords.append({"id": keyword.id, "keyword": keyword.keyword})
 
@@ -241,7 +253,7 @@ async def create_keyword(project_id: int, keyword_data: KeywordCreate, db: Sessi
         project_id=project_id,
         keyword=keyword_data.keyword,
         difficulty_score=keyword_data.difficulty_score,
-        status="active"
+        status="active",
     )
     db.add(keyword)
     db.commit()

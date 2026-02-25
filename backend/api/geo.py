@@ -23,13 +23,17 @@ router = APIRouter(prefix="/api/geo", tags=["GEO文章"])
 
 # ==================== 请求/响应模型 ====================
 
+
 class GenerateArticleRequest(BaseModel):
     """文章生成请求模型"""
+
     keyword_id: int
     company_name: str
     # 发布策略相关（新增）
     target_platforms: Optional[List[str]] = Field(None, description="预设目标平台列表")
-    publish_strategy: Optional[str] = Field("draft", description="发布策略：draft=仅生成草稿 immediate=生成后立即发布 scheduled=定时发布")
+    publish_strategy: Optional[str] = Field(
+        "draft", description="发布策略：draft=仅生成草稿 immediate=生成后立即发布 scheduled=定时发布"
+    )
     scheduled_at: Optional[str] = Field(None, description="定时发布时间（ISO格式）")
 
 
@@ -38,6 +42,7 @@ class ArticleCallbackRequest(BaseModel):
     n8n异步回调请求模型
     n8n生成完成后将结果通过此接口回调
     """
+
     article_id: int = Field(..., description="文章ID，用于关联更新对应记录")
     title: Optional[str] = Field(None, description="文章标题")
     content: Optional[str] = Field(None, description="文章内容")
@@ -51,6 +56,7 @@ class ArticleResponse(BaseModel):
     """
     🌟 核心模型：解决前端列表显示的所有字段需求
     """
+
     id: int
     keyword_id: int
     title: Optional[str] = None
@@ -98,12 +104,13 @@ class ProjectResponse(BaseModel):
 
 # ==================== 异步辅助逻辑 ====================
 
+
 async def run_generate_task(
     keyword_id: int,
     company_name: str,
     target_platforms: Optional[List[str]] = None,
     publish_strategy: str = "draft",
-    scheduled_at: Optional[str] = None
+    scheduled_at: Optional[str] = None,
 ):
     """后台执行生成任务的闭包"""
     db = SessionLocal()
@@ -114,7 +121,7 @@ async def run_generate_task(
             company_name,
             target_platforms=target_platforms,
             publish_strategy=publish_strategy,
-            scheduled_at=scheduled_at
+            scheduled_at=scheduled_at,
         )
     except Exception as e:
         logger.error(f"❌ 后台生成任务失败: {str(e)}")
@@ -123,6 +130,7 @@ async def run_generate_task(
 
 
 # ==================== 接口实现 ====================
+
 
 @router.get("/projects", response_model=List[ProjectResponse])
 async def list_projects(db: Session = Depends(get_db)):
@@ -147,7 +155,7 @@ async def generate_article(request: GenerateArticleRequest, background_tasks: Ba
         request.company_name,
         request.target_platforms,
         request.publish_strategy,
-        request.scheduled_at
+        request.scheduled_at,
     )
     return ApiResponse(success=True, message="生成任务已提交，请在列表查看进度")
 
@@ -156,8 +164,10 @@ async def generate_article(request: GenerateArticleRequest, background_tasks: Ba
 async def list_articles(
     project_id: Optional[int] = Query(None, description="项目ID筛选"),
     limit: int = Query(100),
-    publish_status: Optional[str] = Query(None, description="发布状态过滤: generating/completed/scheduled/publishing/published/failed"),
-    db: Session = Depends(get_db)
+    publish_status: Optional[str] = Query(
+        None, description="发布状态过滤: generating/completed/scheduled/publishing/published/failed"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     获取文章列表（按创建时间倒序）
@@ -294,6 +304,7 @@ async def handle_n8n_callback(request: ArticleCallbackRequest, db: Session = Dep
 
             # 异步调用发布逻辑
             from backend.services.geo_article_service import GeoArticleService
+
             service = GeoArticleService(db)
             asyncio.create_task(service.execute_publish(article.id))
 
