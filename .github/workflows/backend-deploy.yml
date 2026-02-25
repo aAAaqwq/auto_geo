@@ -112,14 +112,37 @@ jobs:
             echo "🔐 登录到 GHCR..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login $REGISTRY -u "${{ github.actor }}" --password-stdin
 
-            # 拉取最新镜像（老王备注：添加超时控制避免卡住）
-            echo "📦 拉取最新镜像..."
-            timeout 600 docker pull $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest
-            if [ $? -eq 0 ]; then
-              echo "✅ 镜像拉取成功"
+            # 诊断：检查磁盘空间
+            echo "📊 检查服务器状态..."
+            df -h
+            docker version
+            echo "✅ 服务器状态正常"
+
+            # 检查是否已有镜像（老王备注：避免重复拉取）
+            EXISTING_IMAGE=$(docker images -q $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest 2>/dev/null)
+            if [ -n "$EXISTING_IMAGE" ]; then
+              echo "ℹ️  镜像已存在，跳过拉取"
+              echo "镜像ID: $EXISTING_IMAGE"
             else
-              echo "❌ 镜像拉取失败或超时"
-              exit 1
+              # 拉取最新镜像（老王备注：增加超时并添加调试）
+              echo "📦 拉取最新镜像..."
+              echo "开始时间: $(date)"
+              timeout 900 docker pull $REGISTRY/$REPO_OWNER/$IMAGE_NAME:latest
+              PULL_EXIT_CODE=$?
+              echo "结束时间: $(date)"
+              echo "docker pull退出码: $PULL_EXIT_CODE"
+
+              if [ $PULL_EXIT_CODE -eq 0 ]; then
+                echo "✅ 镜像拉取成功"
+              elif [ $PULL_EXIT_CODE -eq 124 ]; then
+                echo "❌ 镜像拉取超时（15分钟）"
+                echo "可能原因：磁盘空间不足或Docker daemon问题"
+                df -h
+                exit 1
+              else
+                echo "❌ 镜像拉取失败，退出码: $PULL_EXIT_CODE"
+                exit 1
+              fi
             fi
 
             echo "📋 继续部署流程..."
