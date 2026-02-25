@@ -203,8 +203,9 @@ jobs:
             docker images "$IMAGE_TO_USE" --format "镜像ID: {{.ID}}  创建时间: {{.CreatedAt}}  大小: {{.Size}}"
 
             echo ""
-            echo "⏹️  第二步：停止旧容器..."
+            echo "⏹️  第二步：停止并删除旧容器..."
 
+            # 老王备注：必须先停止容器，否则镜像无法删除
             if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
                 echo "发现旧容器，正在停止..."
                 docker stop $CONTAINER_NAME || true
@@ -217,8 +218,25 @@ jobs:
             echo ""
             echo "🗑️  第三步：清理旧镜像..."
 
-            # 清理旧镜像
-            docker images | grep auto_geo_backend | tail -n +2 | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || echo "无旧镜像需要清理"
+            # 老王备注：删除所有同名标签的旧镜像（保留新拉取的）
+            # 先获取当前使用镜像的IMAGE ID
+            CURRENT_IMAGE_ID=$(docker images "$IMAGE_TO_USE" --format "{{.ID}}")
+
+            # 删除所有同名镜像（包括当前标签指向的旧层）
+            docker images "$IMAGE_TO_USE" --format "{{.ID}}" | while read image_id; do
+                if [ "$image_id" != "$CURRENT_IMAGE_ID" ]; then
+                    echo "删除旧镜像: $image_id"
+                    docker rmi -f "$image_id" 2>/dev/null || true
+                fi
+            done
+
+            # 清理所有 <none> (dangling) 镜像
+            docker image prune -f
+
+            # 显示剩余镜像
+            echo ""
+            echo "=== 当前镜像列表 ==="
+            docker images "$IMAGE_TO_USE"
 
             echo ""
             echo "📁 第四步：准备数据目录..."
