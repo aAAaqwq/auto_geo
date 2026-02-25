@@ -97,6 +97,10 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    # 老王备注：job级别权限，确保能上传SARIF到GitHub Security
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout
