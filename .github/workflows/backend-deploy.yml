@@ -161,7 +161,14 @@ jobs:
             # ============================================
 
             echo ""
-            echo "📦 第一步：拉取最新镜像（优先阿里云）..."
+            echo "📦 第一步：清理本地缓存的 latest 镜像..."
+
+            # 老王备注：先删除本地 latest 标签的旧镜像，确保拉取到最新版本
+            docker rmi $ALIYUN_IMAGE:latest 2>/dev/null || echo "阿里云镜像本地无缓存"
+            docker rmi $GHCR_IMAGE:latest 2>/dev/null || echo "GHCR镜像本地无缓存"
+
+            echo ""
+            echo "📦 第二步：拉取最新镜像（优先阿里云）..."
 
             PULL_SUCCESS=0
             USE_REGISTRY=""
@@ -203,7 +210,7 @@ jobs:
             docker images "$IMAGE_TO_USE" --format "镜像ID: {{.ID}}  创建时间: {{.CreatedAt}}  大小: {{.Size}}"
 
             echo ""
-            echo "⏹️  第二步：停止并删除旧容器..."
+            echo "⏹️  第三步：停止并删除旧容器..."
 
             # 老王备注：必须先停止容器，否则镜像无法删除
             if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
@@ -216,7 +223,7 @@ jobs:
             fi
 
             echo ""
-            echo "🗑️  第三步：清理旧镜像..."
+            echo "🗑️  第四步：清理旧镜像..."
 
             # 老王备注：删除所有同名标签的旧镜像（保留新拉取的）
             # 先获取当前使用镜像的IMAGE ID
@@ -239,14 +246,14 @@ jobs:
             docker images "$IMAGE_TO_USE"
 
             echo ""
-            echo "📁 第四步：准备数据目录..."
+            echo "📁 第五步：准备数据目录..."
 
             mkdir -p ~/autogeo/data ~/autogeo/logs ~/autogeo/database ~/autogeo/cookies
             chmod -R 777 ~/autogeo
             echo "✅ 数据目录准备完成"
 
             echo ""
-            echo "🚀 第五步：启动新容器..."
+            echo "🚀 第六步：启动新容器..."
 
             docker rm -f $CONTAINER_NAME 2>/dev/null || true
 
@@ -284,7 +291,7 @@ jobs:
             docker exec $CONTAINER_NAME ls -la /app/backend/ | head -10 2>/dev/null || echo "无法列出目录"
 
             echo ""
-            echo "🔍 第六步：检查容器状态..."
+            echo "🔍 第七步：检查容器状态..."
 
             sleep 5
             CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "not_found")
@@ -298,7 +305,7 @@ jobs:
             fi
 
             echo ""
-            echo "⏳ 第七步：等待服务就绪..."
+            echo "⏳ 第八步：等待服务就绪..."
 
             READY=0
             for i in {1..24}; do
