@@ -40,15 +40,6 @@ class ProjectRank(BaseModel):
     ai_mention_rate: float
     brand_relevance: float
 
-
-class ArticleStatsResponse(BaseModel):
-    """文章统计响应模型"""
-    total: int = 0
-    generating: int = 0
-    completed: int = 0  # 待发布 (scheduled)
-    published: int = 0
-    failed: int = 0
-
 class TrendDataPoint(BaseModel):
     """趋势数据点"""
     date: str
@@ -325,11 +316,11 @@ async def get_summary_stats(
     
     return SummaryStats(
         total_articles=total_articles,
-        common_articles=common_count,
-        geo_articles=geo_count,
+        common_articles=0,  # 仪表盘只统计GeoArticle
+        geo_articles=total_articles,  # 所有文章都是GeoArticle
         publish_success_rate=pub_rate,
-        publish_success_count=total_pub_success,
-        publish_total_count=total_pub_count,
+        publish_success_count=geo_pub_published,
+        publish_total_count=geo_pub_total,
         keyword_hit_rate=kw_rate,
         keyword_hit_count=kw_hit_count,
         keyword_check_count=idx_total,
