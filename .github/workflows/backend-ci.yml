@@ -105,7 +105,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 老王备注：必须fetch-all才能检测完整历史
+          fetch-depth: 0
 
+      # 老王备注：Gitleaks检测代码中的密钥泄露、硬编码密码、API密钥等
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # 可选：Pro版本
+
+      # 老王备注：Trivy检测依赖包的已知漏洞（CVE）
       - name: Run Trivy
         uses: aquasecurity/trivy-action@master
         with:
