@@ -179,26 +179,12 @@ jobs:
       # 老王备注：验证Windows构建产物
       - name: Verify Windows build
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
           Write-Host "=== 验证Windows构建产物 ==="
-          if (Test-Path "dist") {
-            Get-ChildItem -Path dist -File | ForEach-Object {
-              Write-Host "✅ 找到: $($_.Name)"
-              Write-Host "   大小: $([math]::Round($_.Length/1MB, 2)) MB"
-              Write-Host "   修改时间: $($_.LastWriteTime)"
-            }
-          } else {
-            Write-Host "❌ dist目录不存在！"
-            exit 1
-          }
-
-          # 检查exe文件
+          if (Test-Path "dist") { Get-ChildItem -Path dist -File | ForEach-Object { Write-Host "✅ 找到: $($_.Name)"; Write-Host "   大小: $([math]::Round($_.Length/1MB, 2)) MB"; Write-Host "   修改时间: $($_.LastWriteTime)" } } else { Write-Host "❌ dist目录不存在！"; exit 1 }
           $exeFiles = Get-ChildItem -Path dist -Filter "*.exe" -ErrorAction SilentlyContinue
-          if (-not $exeFiles) {
-            Write-Host "❌ 未找到exe文件！"
-            exit 1
-          }
+          if (-not $exeFiles) { Write-Host "❌ 未找到exe文件！"; exit 1 }
           Write-Host "✅ exe文件验证通过！"
 
       # 老王备注：验证Linux构建产物
@@ -226,8 +212,16 @@ jobs:
           echo "✅ macOS构建产物验证通过！"
 
       # 老王备注：列出所有构建产物（用于调试）
-      - name: List all build artifacts
-        if: always()
+      - name: List all build artifacts (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "=== dist目录内容 ==="
+          if (Test-Path "dist") { Get-ChildItem -Path dist -File | ForEach-Object { Write-Host "$($_.Name) - $([math]::Round($_.Length/1MB, 2)) MB" } } else { Write-Host "dist目录不存在" }
+
+      # 老王备注：列出所有构建产物（用于调试）
+      - name: List all build artifacts (Linux/macOS)
+        if: always() && runner.os != 'Windows'
         run: |
           echo "=== dist目录内容 ==="
           ls -lah dist/ 2>/dev/null || echo "dist目录不存在"
