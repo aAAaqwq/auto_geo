@@ -7,9 +7,10 @@ on:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
-    branches: [master, dev]
+    branches: [master, dev, main]
     paths:
       - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
 
 env:
   NODE_VERSION: '20'
