@@ -273,8 +273,7 @@ class RAGFlowClient:
         """
         try:
             resp = self.session.get(
-                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}",
-                timeout=self.timeout
+                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}", timeout=self.timeout
             )
             resp.raise_for_status()
             return resp.json()
@@ -297,25 +296,19 @@ class RAGFlowClient:
             # RAGFlow可能通过不同的API获取文档内容
             # 这里尝试通过检索API获取
             result = self.retrieve(
-                question="获取完整文档内容",
-                dataset_ids=[dataset_id],
-                top_k=1,
-                similarity_threshold=0.0
+                question="获取完整文档内容", dataset_ids=[dataset_id], top_k=1, similarity_threshold=0.0
             )
-            
-            if result.get('code') == 0:
-                chunks = result.get('data', {}).get('chunks', [])
+
+            if result.get("code") == 0:
+                chunks = result.get("data", {}).get("chunks", [])
                 for chunk in chunks:
-                    if chunk.get('document_id') == document_id:
+                    if chunk.get("document_id") == document_id:
                         return {
-                            'code': 0,
-                            'data': {
-                                'content': chunk.get('content', ''),
-                                'title': chunk.get('document_name', '')
-                            }
+                            "code": 0,
+                            "data": {"content": chunk.get("content", ""), "title": chunk.get("document_name", "")},
                         }
-            
-            return {'code': -1, 'message': '文档内容获取失败'}
+
+            return {"code": -1, "message": "文档内容获取失败"}
         except Exception as e:
             logger.error(f"获取文档内容失败: {e}")
             return {"code": -1, "message": str(e)}
@@ -336,16 +329,16 @@ class RAGFlowClient:
         try:
             # 先删除旧文档
             delete_result = self.delete_document(dataset_id, document_id)
-            if delete_result.get('code') != 0:
+            if delete_result.get("code") != 0:
                 logger.warning(f"删除旧文档失败，可能文档不存在: {document_id}")
-            
+
             # 创建新文档
             if title and content:
                 new_result = self.upload_document_content(dataset_id, title, content)
-                if new_result.get('code') == 0:
+                if new_result.get("code") == 0:
                     logger.info(f"更新文档成功: {title}")
                     return new_result
-            
+
             return {"code": -1, "message": "更新文档失败"}
         except Exception as e:
             logger.error(f"更新文档失败: {e}")
@@ -364,8 +357,7 @@ class RAGFlowClient:
         """
         try:
             resp = self.session.delete(
-                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}",
-                timeout=self.timeout
+                f"{self.base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}", timeout=self.timeout
             )
             resp.raise_for_status()
             result = resp.json()
@@ -549,5 +541,6 @@ def get_ragflow_client() -> RAGFlowClient:
     global _ragflow_client
     if _ragflow_client is None:
         from backend.config import RAGFLOW_BASE_URL, RAGFLOW_API_KEY
+
         _ragflow_client = RAGFlowClient(base_url=RAGFLOW_BASE_URL, api_key=RAGFLOW_API_KEY)
     return _ragflow_client
