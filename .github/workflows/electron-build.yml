@@ -258,11 +258,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 老王备注（2026-02-26）：上传构建artifacts到GitHub（路径相对于仓库根目录）
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-${{ matrix.target }}
-          path: dist/*
+          path: frontend/dist/*
           retention-days: 30
           if-no-files-found: error
         if: always()
@@ -289,7 +290,7 @@ jobs:
             done
           fi
 
-      # 老王备注（2026-02-26）：Linux/macOS构建摘要
+      # 老王备注（2026-02-26）：Linux/macOS构建摘要（使用纯bash语法）
       - name: Build summary (Linux/macOS)
         if: success() && runner.os != 'Windows'
         run: |
@@ -301,5 +302,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### 构建产物：" >> $GITHUB_STEP_SUMMARY
           if [ -d "dist" ]; then
-            ls -lh dist/ | tail -n +2 | awk '{print "- "$9" ("$5")"}' >> $GITHUB_STEP_SUMMARY
+            for file in dist/*.{AppImage,deb,dmg}; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                size=$(ls -lh "$file" | awk '{print $5}')
+                echo "- $filename ($size)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
           fi
