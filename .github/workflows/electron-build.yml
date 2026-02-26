@@ -252,7 +252,7 @@ jobs:
         if: always()
 
       - name: Build summary
-        if: success()
+        if: success() && runner.os == 'Windows'
         run: |
           echo "### 🎉 ${{ matrix.platform }} 构建成功！" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -267,4 +267,3 @@ jobs:
             }
           fi
         shell: bash
-        if: runner.os == 'Windows'
