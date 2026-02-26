@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / ".cookies"
 
-# 老王备注：数据库目录需要和代码目录分离，否则 Docker 挂载会覆盖代码！
+# 数据库目录需要和代码目录分离，否则 Docker 挂载会覆盖代码！
 # 本地开发: backend/database/
 # Docker 环境: /app/database/ (独立目录，不覆盖代码)
 _DOCKER_DB_DIR = Path("/app/database")
@@ -37,13 +37,13 @@ APP_VERSION = "2.0.0"
 DEBUG = True
 
 # ==================== 服务配置 ====================
-# 老王备注：生产环境用0.0.0.0监听所有IP，Docker外部才能访问！
+# 生产环境用0.0.0.0监听所有IP，Docker外部才能访问！
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8001"))  # 修改的：避开8000端口的Windows残留占用问题
 RELOAD = False  # 修复：Windows 上 Playwright 需要 ProactorEventLoop，与 reload 模式冲突！
 
 # CORS配置
-# 老王备注：添加生产服务器IP，否则前端会跨域报错！
+# 添加生产服务器IP，否则前端会跨域报错！
 _CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
 CORS_ORIGINS = [
     "http://localhost:5179",
