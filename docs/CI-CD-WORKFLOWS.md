@@ -453,23 +453,82 @@ REPO_OWNER_LOWER: architecture-matrix
   - `SERVER_SSH_KEY`: SSH私钥
   - `SERVER_PORT`: SSH端口 (默认22)
   - `BACKEND_PORT`: 后端端口 (默认8001)
-  - `GITHUB_TOKEN`: GHCR认证
-- **部署流程**:
-  1. 登录GHCR
-  2. 拉取最新镜像 (`ghcr.io/architecture-matrix/auto_geo_backend:latest`)
-  3. 停止并删除旧容器
-  4. 创建数据目录并修复权限 (`chmod -R 777 ~/autogeo`)
-  5. 启动新容器:
-     - 容器名: `autogeo-backend`
-     - 端口映射: `PORT:8001`
-     - 卷挂载:
-       - `~/autogeo/data:/app/data`
-       - `~/autogeo/logs:/app/logs`
-       - `~/autogeo/database:/app/backend/database`
-       - `~/autogeo/cookies:/app/.cookies`
-  6. 健康检查 (最多12次，每次5秒)
-  7. 清理未使用的镜像
+  - `ALIYUN_ACR_USERNAME`: 阿里云ACR用户名
+  - `ALIYUN_ACR_PASSWORD`: 阿里云ACR密码
+- **部署流程** (8步):
+  1. **清理本地缓存**: 删除服务器上旧的 `latest` 镜像，确保拉取最新版本
+  2. **拉取新镜像**: 优先从阿里云ACR拉取，失败则用GHCR
+  3. **停止旧容器**: 停止并删除旧的 `autogeo-backend` 容器
+  4. **清理旧镜像**: 删除所有同名旧镜像，释放磁盘空间
+  5. **准备数据目录**: 创建 `~/autogeo/` 下的数据目录
+  6. **启动新容器**: 使用新镜像启动容器
+  7. **检查容器状态**: 验证容器没有立即退出
+  8. **等待服务就绪**: 轮询健康检查接口，最多等待2分钟
+- **容器启动命令**:
+  ```bash
+  docker run -d \
+    --name autogeo-backend \
+    --restart unless-stopped \
+    -p 8001:8001 \
+    -v ~/autogeo/data:/app/data \
+    -v ~/autogeo/logs:/app/logs \
+    -v ~/autogeo/database:/app/database \
+    -v ~/autogeo/cookies:/app/.cookies \
+    -e ENVIRONMENT=production \
+    -e HOST=0.0.0.0 \
+    -e PYTHONUNBUFFERED=1 \
+    -e N8N_BASE_URL=https://n8n.opencaio.cn \
+    -e RAGFLOW_BASE_URL=https://ragflow.xinzhixietong.com \
+    --health-cmd="curl -f http://localhost:8001/api/health || exit 1" \
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-retries=3 \
+    crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend:latest
+  ```
 - **部署摘要**: 输出到GitHub Step Summary
+
+**老王备注（2026-02-25 Docker部署完整修复记录）**：
+
+- **问题1: Python模块导入失败**
+  - ❌ 错误: `ImportError: cannot import name 'init_db' from 'backend.database' (unknown location)`
+  - 原因: WORKDIR 是 `/app/backend`，导致 `sys.path[0]` 是 `/app/backend`，`from backend.database import ...` 解析失败
+  - 修复: 改变 WORKDIR 为 `/app`，CMD 为 `python -m backend.main`
+  - commit: df6c4a1
+
+- **问题2: 数据和代码目录混在一起**
+  - ❌ 错误: `-v ~/autogeo/database:/app/backend/database` 会覆盖容器内的代码目录
+  - 原因: `/app/backend/database/` 既有代码（`__init__.py`, `models.py`）又有数据（`auto_geo_v3.db`）
+  - 用户发现: "我认为就是这个启动容器的命令有问题，我认为不应该用-v"
+  - 修复:
+    1. `config.py`: Docker 环境使用 `/app/database`（独立目录）
+    2. `Dockerfile`: 创建 `/app/database` 目录用于存储数据
+    3. `workflow`: 修改 volume 挂载从 `/app/backend/database` 改为 `/app/database`
+  - commit: 5a9e8f0
+
+- **问题3: 镜像缓存导致拉取旧版本**
+  - ❌ 问题: 服务器上本地镜像比 ACR 新镜像早1分钟
+  - 原因: Docker 使用本地缓存的 `latest` 镜像
+  - 修复: 在拉取前先删除本地 `latest` 镜像
+  - commit: fcca70f
+
+- **最终容器内结构**:
+  ```
+  /app/
+  ├── backend/          # 代码目录（不挂载）
+  │   ├── main.py
+  │   ├── database/     # 代码文件：__init__.py, models.py
+  │   └── ...
+  ├── database/         # 数据库文件（挂载）
+  ├── data/             # 其他数据（挂载）
+  ├── logs/             # 日志文件（挂载）
+  └── .cookies/         # Cookies（挂载）
+  ```
+
+- **镜像仓库配置**:
+  | 仓库 | 地址 | 说明 |
+  |-----|------|------|
+  | 阿里云ACR（广州） | `crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend` | 优先拉取 |
+  | GHCR | `ghcr.io/architecture-matrix/auto_geo_backend` | 备用仓库 |
 
 ---
 
