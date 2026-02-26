@@ -1,8 +1,6 @@
 # AutoGeo CI/CD 工作流文档
 
-**维护者**: 老王
 **更新时间**: 2026-02-25
-**备注**: 艹，这个文档记录了所有GitHub Actions workflows的功能，别tm乱改！
 
 ---
 
@@ -204,7 +202,7 @@ Backend CI通过3个job确保后端代码质量：
       security-events: write
   ```
 
-**老王备注（2026-02-25完整修复记录）**：
+**备注（2026-02-25完整修复记录）**：
 
 - **第1次修复**: 添加workflow级别的permissions配置
   - ❌ 问题：仍然报错"Resource not accessible by integration"
@@ -487,7 +485,7 @@ REPO_OWNER_LOWER: architecture-matrix
   ```
 - **部署摘要**: 输出到GitHub Step Summary
 
-**老王备注（2026-02-25 Docker部署完整修复记录）**：
+**备注（2026-02-25 Docker部署完整修复记录）**：
 
 - **问题1: Python模块导入失败**
   - ❌ 错误: `ImportError: cannot import name 'init_db' from 'backend.database' (unknown location)`
@@ -536,7 +534,7 @@ REPO_OWNER_LOWER: architecture-matrix
 
 ### pyproject.toml
 
-老王我添加的Ruff配置，确保CI检查正常通过：
+添加的Ruff配置，确保CI检查正常通过：
 
 ```toml
 [tool.ruff]
@@ -546,7 +544,7 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["F"]  # 只检查基本错误
 ignore = [
-    "E722",  # 裸except - 老王我故意用的
+    "E722",  # 裸except
     "F403", "F405",  # 星号导入
     "F401",  # 未使用导入
     "F841",  # 未使用变量
@@ -624,11 +622,6 @@ build-and-push ──→ deploy ──→ ✅ 部署成功
   npm run dev  # 本地有GUI，可以启动
   ```
 
-**老王备注（2026-02-25）**：
-- 之前老王我犯了个SB错误，尝试在CI启动Electron
-- 结果每次都`ENOENT`，因为CI环境压根没有显示器！
-- 现在改为只验证构建，不启动窗口 ✅
-
 ### Q2: Backend CI的Ruff检查失败？
 
 **A**: 本地运行检查：
@@ -652,7 +645,7 @@ git add backend/
 git commit -m "fix: 使用Ruff自动格式化代码"
 ```
 
-**老王备注（2026-02-25修复记录）**：
+**备注（2026-02-25修复记录）**：
 - **问题**: 69个文件格式不符合Ruff规范，导致`ruff format --check .`失败
 - **原因**: 代码风格与pyproject.toml中定义的Ruff格式规范不一致
 - **解决**: 运行`ruff format .`自动格式化所有文件
@@ -708,7 +701,7 @@ git commit -m "fix: 使用Ruff自动格式化代码"
    git push
    ```
 
-**老王备注**：
+**备注**：
 - ❌ **永远不要**在代码中硬编码密钥、密码、Token
 - ✅ 使用环境变量或.env文件（记得添加到.gitignore）
 - ✅ 测试密钥应该放在.env.example中，格式：`API_KEY=your_api_key_here`
@@ -781,7 +774,7 @@ paths = [
 
 ## 🎯 总结
 
-老王我设计的这套CI/CD流程覆盖了：
+设计的这套CI/CD流程覆盖了：
 - ✅ **代码质量检查** (Lint, Type Check, Tests)
 - ✅ **安全扫描** (Dependency Review, Trivy)
 - ✅ **跨平台构建** (Windows, Linux, macOS)
@@ -794,9 +787,6 @@ paths = [
 3. **跨平台兼容**: Windows和Linux都测试
 4. **自动化部署**: push到main自动部署生产
 
-艹！这套流程老王我调试了很久，别tm乱改！
-
 ---
 
 **最后更新**: 2026-02-25
-**维护者**: 老王
