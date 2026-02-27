@@ -258,6 +258,48 @@ export const publishApi = {
   retry: (recordId: number) => post(`/publish/retry/${recordId}`)
 }
 
+// ==================== 8. 自动发布任务 API ====================
+export const autoPublishApi = {
+  // 获取任务列表
+  getTasks: (params?: { status?: string; limit?: number; offset?: number }) =>
+    get('/auto-publish/tasks', params),
+
+  // 获取任务详情（含子任务记录）
+  getTask: (taskId: number) => get(`/auto-publish/tasks/${taskId}`),
+
+  // 创建任务
+  create: (data: {
+    name: string
+    description?: string
+    article_ids: number[]
+    account_ids: number[]
+    exec_type: 'immediate' | 'scheduled' | 'interval'
+    scheduled_at?: string
+    interval_minutes?: number
+  }) => post('/auto-publish/tasks', data),
+
+  // 更新任务
+  update: (taskId: number, data: {
+    name?: string
+    description?: string
+    status?: string
+    scheduled_at?: string
+    interval_minutes?: number
+  }) => put(`/auto-publish/tasks/${taskId}`, data),
+
+  // 删除任务
+  delete: (taskId: number) => del(`/auto-publish/tasks/${taskId}`),
+
+  // 手动启动任务
+  start: (taskId: number) => post(`/auto-publish/tasks/${taskId}/start`),
+
+  // 取消任务
+  cancel: (taskId: number) => post(`/auto-publish/tasks/${taskId}/cancel`),
+
+  // 重试失败任务
+  retry: (taskId: number) => post(`/auto-publish/tasks/${taskId}/retry`)
+}
+
 // 导出统一的api对象
 export const api = {
   account: accountApi,
@@ -266,7 +308,8 @@ export const api = {
   indexCheck: indexCheckApi,
   reports: reportsApi,
   scheduler: schedulerApi,
-  publish: publishApi
+  publish: publishApi,
+  autoPublish: autoPublishApi
 }
 
 // 导出默认实例

@@ -113,12 +113,20 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '发布记录', icon: 'Clock', order: 10 },
       },
 
+      // 10.5 自动发布任务管理（新增）
+      {
+        path: 'auto-publish',
+        name: 'AutoPublish',
+        component: () => import('@/views/publish/AutoPublishPage.vue'),
+        meta: { title: '自动发布任务', icon: 'List', order: 11 },
+      },
+
       // 11. 收录监控
       {
         path: 'geo/monitor',
         name: 'GeoMonitor',
         component: () => import('@/views/geo/Monitor.vue'),
-        meta: { title: '收录监控', icon: 'Monitor', order: 11 },
+        meta: { title: '收录监控', icon: 'Monitor', order: 12 },
       },
 
       // 12. 数据报表
@@ -126,7 +134,7 @@ const routes: RouteRecordRaw[] = [
         path: 'data-report',
         name: 'DataReport',
         component: () => import('@/views/report/DataReport.vue'),
-        meta: { title: '数据报表', icon: 'DataAnalysis', order: 12 },
+        meta: { title: '数据报表', icon: 'DataAnalysis', order: 13 },
       },
 
       // 13. 定时任务
@@ -134,7 +142,7 @@ const routes: RouteRecordRaw[] = [
         path: 'scheduler',
         name: 'Scheduler',
         component: () => import('@/views/scheduler/SchedulerPage.vue'),
-        meta: { title: '定时任务', icon: 'Timer', order: 13 },
+        meta: { title: '定时任务', icon: 'Timer', order: 14 },
       },
 
       // 14. 系统设置
@@ -142,7 +150,7 @@ const routes: RouteRecordRaw[] = [
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsPage.vue'),
-        meta: { title: '系统设置', icon: 'Setting', order: 14 },
+        meta: { title: '系统设置', icon: 'Setting', order: 15 },
       },
 
       // ========== 以下是不在侧边栏显示的辅助路由 ==========
