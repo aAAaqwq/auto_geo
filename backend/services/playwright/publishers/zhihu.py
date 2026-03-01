@@ -529,7 +529,7 @@ class ZhihuPublisher(BasePublisher):
             for selector in selectors:
                 try:
                     # 检查按钮是否存在且可点击
-                    if await self.wait_for_selector(selector, 5000):
+                    if await self.wait_for_selector(page, selector, 5000):
                         # 再次检查是否禁用
                         is_disabled = await page.is_disabled(selector)
                         if not is_disabled:
