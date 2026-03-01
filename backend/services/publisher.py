@@ -7,6 +7,7 @@ Playwright 自动发布服务
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
@@ -532,7 +533,7 @@ class PublishTask:
         try:
             # 1. 启动浏览器
             browser = await playwright.chromium.launch(
-                headless=False,  # 显示浏览器，方便调试
+                headless=os.environ.get("AUTOGEO_HEADLESS", "true").lower() == "true",
                 args=BROWSER_ARGS,
             )
 

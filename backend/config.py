@@ -159,3 +159,6 @@ AI_PLATFORMS = {
 # 收录检测定时任务配置
 INDEX_CHECK_HOUR = 2  # 每天凌晨2点执行
 INDEX_CHECK_MINUTE = 0
+
+# 质检阈值
+QUALITY_THRESHOLD = int(os.environ.get("AUTOGEO_QUALITY_THRESHOLD", "60"))

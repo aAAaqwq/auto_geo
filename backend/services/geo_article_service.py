@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.database.models import GeoArticle, Keyword
 from backend.services.n8n_client import get_n8n_client
+from backend.config import QUALITY_THRESHOLD
 
 
 class GeoArticleService:
@@ -116,7 +117,7 @@ class GeoArticleService:
         article.readability_score = result.get("readability_score")
 
         # 判断是否通过质检
-        if article.quality_score and article.quality_score >= 60:
+        if article.quality_score and article.quality_score >= QUALITY_THRESHOLD:
             article.quality_status = "passed"
         else:
             article.quality_status = "failed"

@@ -104,7 +104,7 @@ class PlaywrightManager:
                 break
 
         launch_options = {
-            "headless": False,
+            "headless": os.environ.get("AUTOGEO_HEADLESS", "true").lower() == "true",
             "args": BROWSER_ARGS + [
                 "--disable-dev-shm-usage",
                 "--disable-background-networking",
