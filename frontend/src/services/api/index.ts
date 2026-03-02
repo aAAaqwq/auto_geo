@@ -258,7 +258,50 @@ export const publishApi = {
   retry: (recordId: number) => post(`/publish/retry/${recordId}`)
 }
 
-// ==================== 8. 自动发布任务 API ====================
+// ==================== 8. 客户管理 API ====================
+export const clientApi = {
+  // 获取客户列表
+  getList: (params?: {
+    page?: number
+    limit?: number
+    status?: number
+    keyword?: string
+    industry?: string
+  }) => get<any>('/clients', params),
+
+  // 获取客户详情
+  getDetail: (id: number) => get<any>(`/clients/${id}`),
+
+  // 获取客户项目列表
+  getProjects: (clientId: number) => get<any>(`/clients/${clientId}/projects`),
+
+  // 创建客户
+  create: (data: {
+    name: string
+    company_name?: string
+    contact_person?: string
+    phone?: string
+    email?: string
+    industry?: string
+    address?: string
+    description?: string
+    status?: number
+  }) => post<any>('/clients', data),
+
+  // 更新客户
+  update: (id: number, data: any) => put<any>(`/clients/${id}`, data),
+
+  // 删除客户
+  delete: (id: number) => del<any>(`/clients/${id}`),
+
+  // 获取统计数据
+  getStats: () => get<any>('/clients/stats/overview'),
+
+  // 获取行业列表
+  getIndustries: () => get<any>('/clients/indicators/list')
+}
+
+// ==================== 9. 自动发布任务 API ====================
 export const autoPublishApi = {
   // 获取任务列表
   getTasks: (params?: { status?: string; limit?: number; offset?: number }) =>
@@ -303,6 +346,7 @@ export const autoPublishApi = {
 // 导出统一的api对象
 export const api = {
   account: accountApi,
+  client: clientApi,
   geoKeyword: geoKeywordApi,
   geoArticle: geoArticleApi,
   indexCheck: indexCheckApi,

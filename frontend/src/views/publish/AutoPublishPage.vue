@@ -11,13 +11,34 @@
 
     <!-- 任务状态过滤 -->
     <div class="filter-bar">
-      <el-radio-group v-model="statusFilter" @change="loadTasks">
-        <el-radio-button label="">全部</el-radio-button>
-        <el-radio-button label="pending">待执行</el-radio-button>
-        <el-radio-button label="running">执行中</el-radio-button>
-        <el-radio-button label="completed">已完成</el-radio-button>
-        <el-radio-button label="failed">失败</el-radio-button>
-      </el-radio-group>
+      <div class="filter-left">
+        <el-radio-group v-model="statusFilter" @change="loadTasks">
+          <el-radio-button label="">全部</el-radio-button>
+          <el-radio-button label="pending">待执行</el-radio-button>
+          <el-radio-button label="running">执行中</el-radio-button>
+          <el-radio-button label="completed">已完成</el-radio-button>
+          <el-radio-button label="failed">失败</el-radio-button>
+        </el-radio-group>
+        <el-select
+          v-model="platformFilter"
+          placeholder="筛选平台"
+          clearable
+          @change="loadTasks"
+          style="width: 150px; margin-left: 12px"
+        >
+          <el-option label="全部平台" value="" />
+          <el-option
+            v-for="(platform, key) in PLATFORMS"
+            :key="key"
+            :label="platform.name"
+            :value="key"
+          >
+            <div class="platform-option">
+              <span>{{ platform.name }}</span>
+            </div>
+          </el-option>
+        </el-select>
+      </div>
       <el-button @click="loadTasks" :loading="loading">
         <el-icon><Refresh /></el-icon>
         刷新
@@ -41,6 +62,15 @@
             <el-tag v-if="task.exec_type === 'immediate'" type="info" size="small">立即执行</el-tag>
             <el-tag v-else-if="task.exec_type === 'scheduled'" type="warning" size="small">定时执行</el-tag>
             <el-tag v-else type="success" size="small">间隔执行</el-tag>
+            <el-tag
+              v-for="platform in getTaskPlatforms(task.id)"
+              :key="platform"
+              size="small"
+              :color="PLATFORMS[platform]?.color"
+              style="margin-left: 4px"
+            >
+              {{ PLATFORMS[platform]?.name || platform }}
+            </el-tag>
           </div>
           <div class="task-actions">
             <el-button
@@ -176,26 +206,26 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="选择账号" prop="account_ids">
+        <el-form-item label="选择平台" prop="platforms">
           <el-select
-            v-model="createForm.account_ids"
+            v-model="createForm.platforms"
             multiple
-            filterable
-            placeholder="请选择发布账号"
+            placeholder="请选择发布平台"
             style="width: 100%"
           >
             <el-option
-              v-for="account in availableAccounts"
-              :key="account.id"
-              :label="account.account_name"
-              :value="account.id"
+              v-for="(platform, key) in PLATFORMS"
+              :key="key"
+              :label="platform.name"
+              :value="key"
             >
-              <div class="account-option">
-                <span>{{ account.account_name }}</span>
-                <el-tag size="small" :color="PLATFORMS[account.platform]?.color">{{ PLATFORMS[account.platform]?.name || account.platform }}</el-tag>
+              <div class="platform-option-item">
+                <span>{{ platform.name }}</span>
+                <el-tag size="small" type="info">{{ getPlatformAccountCount(key) }}个账号</el-tag>
               </div>
             </el-option>
           </el-select>
+          <div class="form-tip">系统将为每个平台自动选择可用账号进行发布</div>
         </el-form-item>
         <el-form-item label="执行类型" prop="exec_type">
           <el-radio-group v-model="createForm.exec_type">
@@ -203,6 +233,10 @@
             <el-radio value="scheduled">定时执行</el-radio>
             <el-radio value="interval">间隔执行</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item label="后台运行">
+          <el-switch v-model="createForm.run_in_background" />
+          <span class="form-tip">开启后任务将在后台运行，可在平台发布监控页面查看进度</span>
         </el-form-item>
         <el-form-item
           v-if="createForm.exec_type === 'scheduled'"
@@ -327,8 +361,11 @@ const { connect, disconnect, onAutoPublishProgress } = useWebSocket()
 const tasks = ref<any[]>([])
 const loading = ref(false)
 const statusFilter = ref('')
+const platformFilter = ref('')
 const availableArticles = ref<any[]>([])
 const availableAccounts = ref<any[]>([])
+// 任务的平台信息缓存（从账号数据中提取）
+const taskPlatforms = ref<Record<number, string[]>>({})
 
 // 创建任务对话框
 const showCreateDialog = ref(false)
@@ -337,8 +374,9 @@ const createForm = ref({
   name: '',
   description: '',
   article_ids: [] as number[],
-  account_ids: [] as number[],
+  platforms: [] as string[],
   exec_type: 'immediate' as 'immediate' | 'scheduled' | 'interval',
+  run_in_background: false,
   scheduled_at: '',
   interval_minutes: null as number | null
 })
@@ -346,7 +384,7 @@ const createFormRef = ref<FormInstance>()
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   article_ids: [{ required: true, message: '请选择文章', trigger: 'change' }],
-  account_ids: [{ required: true, message: '请选择账号', trigger: 'change' }],
+  platforms: [{ required: true, message: '请选择平台', trigger: 'change' }],
   scheduled_at: [{ required: true, message: '请选择执行时间', trigger: 'change' }],
   interval_minutes: [{ required: true, message: '请输入间隔分钟数', trigger: 'blur' }]
 }
@@ -368,8 +406,13 @@ const loadTasks = async () => {
     if (statusFilter.value) {
       params.status = statusFilter.value
     }
+    if (platformFilter.value) {
+      params.platform = platformFilter.value
+    }
     const res: any = await autoPublishApi.getTasks(params)
     tasks.value = res.data?.items || []
+    // 提取每个任务涉及的平台信息
+    extractTaskPlatforms()
   } catch (e) {
     console.error('加载任务失败:', e)
   } finally {
@@ -395,6 +438,34 @@ const loadAvailableData = async () => {
   }
 }
 
+// 从任务数据中提取涉及的平台
+const extractTaskPlatforms = () => {
+  taskPlatforms.value = {}
+  tasks.value.forEach(task => {
+    // 从账号列表中查找该任务使用的账号所属平台
+    const platforms = new Set<string>()
+    if (task.account_ids && Array.isArray(task.account_ids)) {
+      task.account_ids.forEach((accountId: number) => {
+        const account = availableAccounts.value.find((a: any) => a.id === accountId)
+        if (account?.platform) {
+          platforms.add(account.platform)
+        }
+      })
+    }
+    taskPlatforms.value[task.id] = Array.from(platforms)
+  })
+}
+
+// 获取任务涉及的平台列表
+const getTaskPlatforms = (taskId: number) => {
+  return taskPlatforms.value[taskId] || []
+}
+
+// 获取平台的账号数量
+const getPlatformAccountCount = (platform: string) => {
+  return availableAccounts.value.filter((a: any) => a.platform === platform).length
+}
+
 // 创建任务
 const createTask = async () => {
   if (!createFormRef.value) return
@@ -403,12 +474,22 @@ const createTask = async () => {
 
     creating.value = true
     try {
+      // 将平台列表转换为账号列表
+      const accountIds: number[] = []
+      createForm.value.platforms.forEach(platform => {
+        const platformAccounts = availableAccounts.value
+          .filter((a: any) => a.platform === platform)
+          .map((a: any) => a.id)
+        accountIds.push(...platformAccounts)
+      })
+
       await autoPublishApi.create({
         name: createForm.value.name,
         description: createForm.value.description || undefined,
         article_ids: createForm.value.article_ids,
-        account_ids: createForm.value.account_ids,
+        account_ids: accountIds,
         exec_type: createForm.value.exec_type,
+        run_in_background: createForm.value.run_in_background || undefined,
         scheduled_at: createForm.value.scheduled_at || undefined,
         interval_minutes: createForm.value.interval_minutes || undefined
       })
@@ -430,8 +511,9 @@ const resetCreateForm = () => {
     name: '',
     description: '',
     article_ids: [],
-    account_ids: [],
+    platforms: [],
     exec_type: 'immediate',
+    run_in_background: false,
     scheduled_at: '',
     interval_minutes: null
   }
@@ -641,6 +723,12 @@ onUnmounted(() => {
   padding: 16px;
   background: var(--bg-secondary, #2a2a2a);
   border-radius: 8px;
+
+  .filter-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
 }
 
 .task-list {
@@ -769,10 +857,19 @@ onUnmounted(() => {
 }
 
 .article-option,
-.account-option {
+.account-option,
+.platform-option-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
+}
+
+.platform-option {
+  width: 100%;
+}
+
+.account-selector {
   width: 100%;
 }
 
