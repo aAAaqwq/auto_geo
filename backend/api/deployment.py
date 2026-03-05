@@ -174,4 +174,4 @@ def _get_location_reason(task_type: str, location: str) -> str:
         else:
             return f"混合模式：'{task_type}'任务将在服务器自动执行"
     else:
-        return f"未知模式"
+        return "未知模式"

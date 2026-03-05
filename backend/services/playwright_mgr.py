@@ -147,7 +147,7 @@ class PlaywrightManager:
             try:
                 asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
                 loop = asyncio.get_event_loop()
-                logger.info(f"✅ 已设置 Windows ProactorEventLoopPolicy")
+                logger.info("✅ 已设置 Windows ProactorEventLoopPolicy")
             except Exception as e:
                 logger.error(f"设置事件循环策略失败: {e}")
 

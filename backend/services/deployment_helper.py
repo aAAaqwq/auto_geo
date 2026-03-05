@@ -24,7 +24,7 @@ def get_browser_headless_mode(operation_type: str = "default") -> bool:
     """
     # 1. 环境变量优先级最高
     if HEADLESS_MODE:
-        logger.debug(f"HEADLESS_MODE环境变量=true, 强制使用headless")
+        logger.debug("HEADLESS_MODE环境变量=true, 强制使用headless")
         return True
 
     # 2. 根据部署模式和操作类型决定
@@ -37,11 +37,11 @@ def get_browser_headless_mode(operation_type: str = "default") -> bool:
         # 本地模式：根据操作类型决定
         if operation_type == "auth":
             # 授权必须显示浏览器
-            logger.debug(f"[本地模式] 授权操作使用headless=False")
+            logger.debug("[本地模式] 授权操作使用headless=False")
             return False
         elif operation_type == "publish":
             # 发布默认显示，但可以headless
-            logger.debug(f"[本地模式] 发布操作使用headless=False（方便调试）")
+            logger.debug("[本地模式] 发布操作使用headless=False（方便调试）")
             return False
         else:
             # 其他操作可以headless
@@ -51,7 +51,7 @@ def get_browser_headless_mode(operation_type: str = "default") -> bool:
     elif DEPLOYMENT_MODE == "hybrid":
         # 混合模式：授权需要GUI，其他可headless
         if operation_type == "auth":
-            logger.debug(f"[混合模式] 授权操作使用headless=False（需要本地浏览器）")
+            logger.debug("[混合模式] 授权操作使用headless=False（需要本地浏览器）")
             return False
         else:
             logger.debug(f"[混合模式] {operation_type} 操作使用headless=True")
