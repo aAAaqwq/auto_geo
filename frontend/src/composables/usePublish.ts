@@ -5,7 +5,7 @@
 
 import { ref, computed } from 'vue'
 import { publishApi } from '@/services/api'
-import type { PublishTask, PublishRecord } from '@/types'
+import type { PublishTask } from '@/types'
 
 export function usePublish() {
   const publishing = ref(false)

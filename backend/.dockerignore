@@ -4,16 +4,37 @@ __pycache__/
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments
 venv/
 env/
 ENV/
 .venv
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+.gitattributes
 
 # IDE
 .vscode/
@@ -22,34 +43,44 @@ ENV/
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-.git/
-.gitignore
-
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
+.mypy_cache/
+dmypy.json
+.pytype/
 
-# Database (will be mounted as volume)
-*.db
-*.db-shm
-*.db-wal
+# Documentation
+*.md
+!README.md
+docs/
 
-# Logs (will be mounted as volume)
+# Logs
 *.log
 logs/
 
-# Environment (production uses env vars)
-.env
-.env.local
+# Database
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
 
-# Documentation
-docs/
-*.md
+# Backups (mounted as volume, don't copy)
+backups/
 
-# Static files that shouldn't be in container
+# Playwright cache
+playwright/.cache/
+
+# Local development files
+docker-compose*.yml
+Dockerfile*
+
+# Misc
+*.tmp
+*.bak
+*.backup
+.DS_Store
+Thumbs.db
 node_modules/

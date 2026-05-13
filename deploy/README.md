@@ -1,179 +1,148 @@
-# AutoGeo 生产环境部署指南
+# AutoGeo 部署指南
 
-## 架构概览
-
-AutoGeo 采用 **3+1 独立部署架构**：
+## 新架构概览（简化版）
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      部署架构图                              │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│   后端服务    │   n8n服务    │  RAGFlow服务 │   前端应用      │
-│  (必需)       │   (必需)     │   (可选)     │   (桌面应用)    │
-├──────────────┼──────────────┼──────────────┼────────────────┤
-│  PostgreSQL  │  PostgreSQL  │   MySQL      │   Electron     │
-│  Backend     │  Redis       │   Redis      │   Vue3         │
-│  Nginx       │  n8n Engine  │   MinIO      │                │
-│              │              │   ES         │                │
-└──────────────┴──────────────┴──────────────┴────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    新部署架构（5容器）                    │
+├─────────────────┬─────────────────┬─────────────────────┤
+│   n8n 服务      │   后端服务      │     前端（桌面）     │
+│   (3容器)       │   (2容器)       │                     │
+├─────────────────┼─────────────────┼─────────────────────┤
+│  PostgreSQL ←───┼─── _backend     │    Electron + Vue3  │
+│  Redis      ←───┼───  (共享)      │                     │
+│  n8n            │   Nginx         │                     │
+└─────────────────┴─────────────────┴─────────────────────┘
 ```
 
-## 服务器规划
-
-| 服务 | 建议配置 | 端口 | 说明 |
-|------|----------|------|------|
-| 后端 | 2核4GB | 80 | 可与n8n同机部署 |
-| n8n | 2核4GB | 5678 | 可与后端同机部署 |
-| RAGFlow | 4核8GB+ | 9380 | **建议独立服务器** |
-
-## 快速部署
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/Architecture-Matrix/Auto_GEO.git
-cd Auto_GEO/deploy
-```
-
-### 2. 部署后端服务
-
-```bash
-# 复制环境变量模板
-cp .env.backend.example .env.backend
-vim .env.backend  # 修改配置
-
-# 执行部署
-./deploy-backend.sh
-```
-
-### 3. 部署 n8n（建议单独服务器）
-
-```bash
-# 在n8n服务器上
-cp .env.n8n.example .env.n8n
-vim .env.n8n  # 修改配置
-
-./deploy-n8n.sh
-```
-
-### 4. 部署 RAGFlow（可选，需8GB+内存）
-
-详见 [RAGFLOW-DEPLOY.md](./RAGFLOW-DEPLOY.md)
-
-```bash
-cp .env.ragflow.example .env.ragflow
-vim .env.ragflow
-
-./ragflow-deploy.sh
-```
-
-## 配置说明
-
-### 后端 .env.backend 关键配置
-
-```bash
-# 数据库密码
-DB_PASSWORD=your-secure-password
-
-# 加密密钥（生成: python -c "import secrets; print(secrets.token_urlsafe(32))"）
-AUTO_GEO_ENCRYPTION_KEY=xxx
-
-# n8n地址（部署后填写）
-N8N_WEBHOOK_URL=http://n8n-server-ip:5678/webhook
-
-# DeepSeek API
-DEEPSEEK_API_KEY=sk-xxx
-
-# RAGFlow地址（可选）
-RAGFLOW_BASE_URL=http://ragflow-server-ip:9380
-```
-
-### n8n .env.n8n 关键配置
-
-```bash
-# n8n服务器IP
-N8N_HOST=your-server-ip
-N8N_PASSWORD=admin-password
-
-# 数据库和Redis密码
-POSTGRES_PASSWORD=xxx
-REDIS_PASSWORD=xxx
-```
-
-## 目录结构
-
-```
-deploy/
-├── docker-compose.backend.yml    # 后端编排
-├── docker-compose.n8n.yml        # n8n编排
-├── docker-compose.ragflow.yml    # RAGFlow编排
-├── deploy-backend.sh             # 后端部署脚本
-├── deploy-n8n.sh                 # n8n部署脚本
-├── ragflow-deploy.sh             # RAGFlow部署脚本
-├── .env.backend.example          # 后端环境变量模板
-├── .env.n8n.example              # n8n环境变量模板
-├── .env.ragflow.example          # RAGFlow环境变量模板
-├── RAGFLOW-DEPLOY.md             # RAGFlow详细文档
-└── README.md                     # 本文档
-```
-
-## 常用命令
-
-| 操作 | 后端 | n8n |
-|------|------|-----|
-| 查看日志 | `docker-compose -f docker-compose.backend.yml logs -f` | `docker-compose -f docker-compose.n8n.yml logs -f` |
-| 停止服务 | `docker-compose -f docker-compose.backend.yml down` | `docker-compose -f docker-compose.n8n.yml down` |
-| 重启 | `docker-compose -f docker-compose.backend.yml restart` | `docker-compose -f docker-compose.n8n.yml restart` |
-
-## 前端使用
-
-前端为 **Electron 桌面应用**，无需服务器部署：
-
-```bash
-cd frontend
-npm install
-npm run dev  # 开发模式
-npm run build  # 打包
-```
-
-用户安装打包后的应用即可使用。
-
-## 故障排查
-
-### 端口冲突
-
-```bash
-# 检查端口占用
-netstat -tlnp | grep 80
-netstat -tlnp | grep 5678
-```
-
-### 登录阿里云ACR失败
-
-使用密码文件方式更安全：
-```bash
-echo 'your-password' > /etc/autogeo/acr-pass
-chmod 600 /etc/autogeo/acr-pass
-# 在.env中设置 ALIYUN_ACR_PASSWORD_FILE=/etc/autogeo/acr-pass
-```
-
-### 数据库迁移失败
-
-```bash
-docker-compose -f docker-compose.backend.yml exec backend alembic upgrade head
-```
-
-## 镜像说明
-
-所有镜像均使用**阿里云镜像站**：
-- `registry.cn-hangzhou.aliyuncs.com/acs-sample/postgres:15-alpine`
-- `registry.cn-hangzhou.aliyuncs.com/acs-sample/redis:7-alpine`
-- `registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:alpine`
-- `registry.cn-hangzhou.aliyuncs.com/acs-sample/n8n:latest`
-
-后端镜像：
-- `crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com/opencaio/auto_geo_backend:latest`
+### 核心变更
+- **后端不再自带数据库**，复用 n8n 的 PostgreSQL
+- **总容器数从 7 → 5**，节省资源
 
 ---
 
-部署完成后，访问 `http://backend-server-ip/docs` 查看 API 文档。
+## 快速开始
+
+### 第一步：部署 n8n（必需）
+
+```bash
+cd n8n/deploy
+
+# 第一次运行会自动创建 .env 文件
+./deploy.sh
+
+# 按提示编辑配置
+nano .env
+
+# 再次运行部署
+./deploy.sh
+```
+
+访问：`http://your-server-ip:5678`
+
+---
+
+### 第二步：部署后端
+
+```bash
+cd deploy
+
+# 1. 复制环境变量模板
+cp .env.backend.example .env.backend
+nano .env.backend
+```
+
+**关键配置（只需改4项）：**
+
+```bash
+# n8n数据库密码（与 n8n/.env 中的一致）
+N8N_DB_PASSWORD=xxx
+
+# 加密密钥（生成: openssl rand -base64 32）
+AUTO_GEO_ENCRYPTION_KEY=xxx
+
+# n8n地址和API Key
+N8N_WEBHOOK_URL=http://ip:5678/webhook
+N8N_API_KEY=xxx
+
+# DeepSeek API
+DEEPSEEK_API_KEY=sk-xxx
+```
+
+```bash
+# 2. 执行部署
+./deploy.sh
+```
+
+访问：`http://your-server-ip/api`
+
+---
+
+## 文件结构
+
+```
+deploy/
+├── docker-compose.backend.yml    # 后端编排（2服务）
+├── deploy.sh                     # 一键部署脚本
+├── .env.backend.example          # 环境变量模板
+└── README.md                     # 本文档
+
+n8n/deploy/
+├── docker-compose.yml            # n8n编排（3服务）
+├── deploy.sh                     # 一键部署脚本
+├── .env                          # 自动生成
+└── backup/                       # 数据备份
+```
+
+---
+
+## 常用命令
+
+| 操作 | 命令 |
+|------|------|
+| 后端日志 | `cd deploy && docker-compose logs -f` |
+| n8n日志 | `cd n8n/deploy && docker-compose logs -f` |
+| 停止后端 | `cd deploy && docker-compose down` |
+| 停止n8n | `cd n8n/deploy && docker-compose down` |
+
+---
+
+## 注意事项
+
+1. **必须先部署 n8n**，后端依赖 n8n 的数据库
+2. 后端会自动在 n8n_postgres 中创建 `autogeo` 数据库
+3. 确保防火墙开放 5678（n8n）和 80（后端）端口
+
+---
+
+## 故障排查
+
+### 后端无法连接数据库
+```bash
+# 检查 n8n_postgres 是否运行
+docker ps | grep n8n_postgres
+
+# 检查密码是否正确
+docker exec n8n_postgres psql -U n8n -c "\l"
+```
+
+### 端口冲突
+```bash
+# 查看端口占用
+netstat -tlnp | grep -E '80|5678'
+```
+
+---
+
+## 可选：部署 RAGFlow
+
+如需 RAG 功能，单独部署（不依赖 n8n）：
+
+```bash
+cd deploy
+cp .env.ragflow.example .env.ragflow
+# 配置后执行
+docker-compose -f docker-compose.ragflow.yml up -d
+```
+
+详见 [RAGFLOW-DEPLOY.md](./RAGFLOW-DEPLOY.md)

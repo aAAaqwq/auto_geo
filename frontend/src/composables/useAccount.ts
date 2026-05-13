@@ -15,15 +15,6 @@ export function useAccount() {
     return await accountStore.loadAccounts(platform)
   }
 
-  // 创建账号
-  const createAccount = async (data: { platform: string; account_name: string; remark?: string }) => {
-    const result = await accountApi.create(data)
-    if (result.success !== false) {
-      await accountStore.loadAccounts()
-    }
-    return result
-  }
-
   // 更新账号
   const updateAccount = async (id: number, data: any) => {
     const result = await accountApi.update(id, data)

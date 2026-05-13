@@ -5,7 +5,7 @@
 
 import { computed } from 'vue'
 import { useArticleStore } from '@/stores'
-import { articleApi } from '@/services/api'
+import { geoArticleApi } from '@/services/api'
 
 export function useArticle() {
   const articleStore = useArticleStore()
