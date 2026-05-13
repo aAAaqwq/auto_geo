@@ -16,7 +16,7 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${BLUE}[STEP]${NC} $1"; }
 
-COMPOSE_FILE="docker-compose.backend.yml"
+COMPOSE_FILE="docker-compose.yml"
 HEALTH_CHECK_RETRIES=30
 
 # 使用说明
@@ -62,7 +62,7 @@ check_n8n() {
         log_error "n8n PostgreSQL 未运行！"
         echo ""
         echo "请先部署 n8n:"
-        echo "  cd ../n8n/deploy"
+        echo "  cd ../n8n"
         echo "  ./deploy.sh"
         exit 1
     fi

@@ -1,35 +1,38 @@
 # AutoGeo 部署指南（宝塔面板版）
 
-## 新架构概览（简化版）
+## 目录结构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    新部署架构（4容器）                    │
-├─────────────────┬─────────────────┬─────────────────────┤
-│   n8n 服务      │   后端服务      │     前端（桌面）     │
-│   (3容器)       │   (1容器)       │                     │
-├─────────────────┼─────────────────┼─────────────────────┤
-│  PostgreSQL ←───┼─── backend      │    Electron + Vue3  │
-│  Redis      ←───┼─── (API:8001)   │                     │
-│  n8n            │                 │                     │
-└─────────────────┴─────────────────┴─────────────────────┘
-         │                              ▲
-         └───── 宝塔 Nginx:80 ──────────┘
+deploy/
+├── README.md                 # 本文件
+├── n8n/                     # n8n 工作流服务
+│   ├── docker-compose.yml
+│   ├── deploy.sh
+│   └── .env.example
+├── backend/                 # 后端 API 服务
+│   ├── docker-compose.yml
+│   ├── deploy.sh
+│   └── .env.example
+├── nginx/                   # Nginx 配置
+│   ├── conf.d/
+│   └── ssl/
+└── scripts/                 # 辅助脚本
+    └── backup.sh
 ```
-
-### 核心变更
-- **后端不再自带数据库**，复用 n8n 的 PostgreSQL
-- **后端不再带 Nginx**，使用宝塔 Nginx 做反向代理
-- **总容器数从 7 → 4**，节省资源
-
----
 
 ## 快速开始
 
 ### 第一步：部署 n8n（必需）
 
 ```bash
-cd n8n/deploy
+cd n8n
+
+# 1. 配置环境变量
+cp .env.example .env
+nano .env
+# 修改: N8N_HOST, N8N_PASSWORD, POSTGRES_PASSWORD
+
+# 2. 部署
 ./deploy.sh
 ```
 
@@ -41,9 +44,7 @@ cd n8n/deploy
 
 后端只提供 API 服务（8001 端口），需要在宝塔添加反向代理：
 
-**方法1：直接创建配置文件**
-
-创建文件：`/www/server/panel/vhost/nginx/autogeo.conf`
+**创建配置文件**：`/www/server/panel/vhost/nginx/autogeo.conf`
 
 ```nginx
 server {
@@ -61,7 +62,7 @@ server {
         proxy_pass http://localhost:8001/docs;
     }
 
-    # WebSocket 支持（如果需要）
+    # WebSocket 支持
     location /ws {
         proxy_pass http://localhost:8001/ws;
         proxy_http_version 1.1;
@@ -70,12 +71,6 @@ server {
     }
 }
 ```
-
-**方法2：使用宝塔面板可视化配置**
-
-1. 登录宝塔面板
-2. 网站 → 添加站点（或使用已有站点）
-3. 配置文件 → 添加上面的 location 配置
 
 **重载 Nginx：**
 ```bash
@@ -87,14 +82,14 @@ server {
 ### 第三步：部署后端
 
 ```bash
-cd deploy
+cd backend
 
 # 1. 配置环境变量
-cp .env.backend.example .env.backend
-nano .env.backend
+cp .env.example .env
+nano .env
 ```
 
-**关键配置（只改4项）：**
+**关键配置：**
 
 ```bash
 # n8n数据库密码（与 n8n/.env 中的一致）
@@ -120,6 +115,30 @@ DEEPSEEK_API_KEY=sk-xxx
 
 ---
 
+## 架构概览
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   部署架构（4容器）                       │
+├─────────────────┬─────────────────┬─────────────────────┤
+│   n8n 服务      │   后端服务      │     前端（静态）     │
+│   (3容器)       │   (1容器)       │                     │
+├─────────────────┼─────────────────┼─────────────────────┤
+│  PostgreSQL ←───┼─── backend      │    /var/www/html    │
+│  Redis      ←───┼─── (API:8001)   │                     │
+│  n8n            │                 │                     │
+└─────────────────┴─────────────────┴─────────────────────┘
+         │                              ▲
+         └───── 宝塔 Nginx:80 ──────────┘
+```
+
+### 核心设计
+- **后端不再自带数据库**，复用 n8n 的 PostgreSQL
+- **后端不再带 Nginx**，使用宝塔 Nginx 做反向代理
+- **总容器数从 7 → 4**，节省资源
+
+---
+
 ## 宝塔环境路径速查
 
 | 项目 | 路径 |
@@ -131,32 +150,17 @@ DEEPSEEK_API_KEY=sk-xxx
 
 ---
 
-## 文件结构
-
-```
-deploy/
-├── docker-compose.backend.yml    # 后端编排（1服务：backend）
-├── deploy.sh                     # 一键部署脚本
-├── .env.backend.example          # 环境变量模板
-└── README.md                     # 本文档
-
-n8n/deploy/
-├── docker-compose.yml            # n8n编排（3服务：postgres+redis+n8n）
-├── deploy.sh                     # 一键部署脚本
-└── .env                          # 自动生成
-```
-
----
-
 ## 常用命令
 
 | 操作 | 命令 |
 |------|------|
-| 后端日志 | `cd deploy && docker-compose logs -f` |
-| n8n日志 | `cd n8n/deploy && docker-compose logs -f` |
-| 停止后端 | `cd deploy && docker-compose down` |
-| 停止n8n | `cd n8n/deploy && docker-compose down` |
-| 重载Nginx | `/www/server/nginx/sbin/nginx -s reload` |
+| 部署 n8n | `cd n8n && ./deploy.sh` |
+| 部署后端 | `cd backend && ./deploy.sh` |
+| n8n 日志 | `cd n8n && docker-compose logs -f` |
+| 后端日志 | `cd backend && docker-compose logs -f` |
+| 停止 n8n | `cd n8n && docker-compose down` |
+| 停止后端 | `cd backend && docker-compose down` |
+| 重载 Nginx | `/www/server/nginx/sbin/nginx -s reload` |
 
 ---
 
