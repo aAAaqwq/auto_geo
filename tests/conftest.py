@@ -22,7 +22,7 @@ sys.path.insert(0, str(project_root))
 
 from backend.database import SessionLocal, init_db
 from backend.database.models import (
-    Account, Article, PublishRecord, Project, Keyword, ReferenceArticle,
+    Account, PublishRecord, Project, Keyword, ReferenceArticle,
     IndexCheckRecord, GeoArticle, QuestionVariant
 )
 
@@ -88,7 +88,6 @@ def clean_db(db):
     db.query(GeoArticle).delete()
     db.query(IndexCheckRecord).delete()
     db.query(QuestionVariant).delete()
-    db.query(Article).delete()
     db.query(Keyword).delete()
     db.query(Project).delete()
     db.query(Account).delete()
@@ -223,18 +222,6 @@ def test_keyword(clean_db, test_project):
     return keyword
 
 
-@pytest.fixture(scope="function")
-def test_article(clean_db):
-    """创建测试文章"""
-    article = Article(
-        title="测试文章标题",
-        content="这是一篇测试文章的内容...",
-        status=0
-    )
-    clean_db.add(article)
-    clean_db.commit()
-    clean_db.refresh(article)
-    return article
 
 
 # ==================== Hooks ====================

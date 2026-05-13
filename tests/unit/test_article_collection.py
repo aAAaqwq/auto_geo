@@ -15,7 +15,6 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from tests.helpers.mock_data import MockData
 from backend.database.models import ReferenceArticle
 from backend.services.article_collector_service import ArticleCollectorService
 from backend.services.playwright.collectors.base import CollectedArticle

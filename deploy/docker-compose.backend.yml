@@ -1,6 +1,6 @@
-# AutoGeo 后端生产环境部署配置
-# 版本: 3.0.0
-# 适用: 阿里云ECS生产部署
+# AutoGeo 后端生产环境部署配置（简化版）
+# 版本: 3.1.0
+# 适用: 阿里云ECS生产部署（不含 RAGFlow）
 
 version: '3.8'
 
@@ -45,7 +45,7 @@ services:
         max-file: "3"
 
   # ============================================
-  # Nginx 反向代理
+  # Nginx 反向代理 + 静态文件服务
   # ============================================
   nginx:
     image: registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:alpine
@@ -60,10 +60,12 @@ services:
           memory: 64M
     ports:
       - "80:80"
+      # - "443:443"  # HTTPS 启用时取消注释
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       - backend
@@ -105,13 +107,13 @@ services:
       - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
       - API_HOST=0.0.0.0
       - API_PORT=8001
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,app://.,file://}
-      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
-      - N8N_API_KEY=${N8N_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+      - N8N_API_KEY=${N8N_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      - RAGFLOW_API_KEY=${RAGFLOW_API_KEY}
-      - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
+      - RAGFLOW_API_KEY=${RAGFLOW_API_KEY:-}
+      - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL:-}
       - AUTO_GEO_ENCRYPTION_KEY=${AUTO_GEO_ENCRYPTION_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=production
