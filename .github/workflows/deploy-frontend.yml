@@ -116,7 +116,7 @@ jobs:
 
             PROJECT_DIR="$HOME/Auto_GEO"
 
-            # 如果目录不存在，克隆项目（仅用于获取 nginx 配置）
+            # 如果目录不存在，克隆项目
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               echo "📦 项目不存在，克隆仓库..."
               mkdir -p "$(dirname "$PROJECT_DIR")"
@@ -130,23 +130,62 @@ jobs:
 
             cd "$PROJECT_DIR"
 
-            # 复制并部署 nginx 配置
-            if [ -f "nginx/server-frontend.conf" ]; then
-              echo "📝 部署 nginx 配置..."
-              sudo cp -f nginx/server-frontend.conf /etc/nginx/sites-available/autogeo.conf
-              sudo ln -sf /etc/nginx/sites-available/autogeo.conf /etc/nginx/sites-enabled/ 2>/dev/null || true
-              # 移除默认配置
-              sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
-            fi
+            # 创建宝塔 nginx 配置（宝塔使用 /www/server/panel/vhost/nginx/）
+            echo "📝 部署 nginx 配置..."
+            cat > /tmp/autogeo.conf << 'NGINX_EOF'
+server
+{
+    listen 80;
+    server_name ${{ secrets.SERVER_HOST }};
+    index index.html index.htm;
+    root /var/www/html/renderer;
 
-            # 检查 nginx 配置语法
-            sudo nginx -t
+    location ~.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$
+    {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
 
-            # 重载 nginx
-            sudo nginx -s reload || sudo systemctl reload nginx || sudo service nginx reload || {
+    location ~.*\.html$
+    {
+        expires -1;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    location /
+    {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/
+    {
+        proxy_pass http://127.0.0.1:8001/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /ws
+    {
+        proxy_pass http://127.0.0.1:8001/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    access_log /www/wwwlogs/autogeo_access.log;
+    error_log /www/wwwlogs/autogeo_error.log;
+}
+NGINX_EOF
+
+            # 复制配置到宝塔目录
+            sudo cp /tmp/autogeo.conf /www/server/panel/vhost/nginx/autogeo.conf
+
+            # 测试并重载 nginx
+            /www/server/nginx/sbin/nginx -t && /www/server/nginx/sbin/nginx -s reload || {
               echo "⚠️ Nginx reload 失败，尝试重启..."
-              sudo nginx -s stop 2>/dev/null || true
-              sudo nginx
+              /www/server/nginx/sbin/nginx -s stop 2>/dev/null || true
+              /www/server/nginx/sbin/nginx
             }
 
             echo ""
