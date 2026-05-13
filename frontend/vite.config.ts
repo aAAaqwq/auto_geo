@@ -59,11 +59,21 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'element-plus': ['element-plus', '@element-plus/icons-vue'],
-          'echarts': ['echarts'],
-          'editor': ['@wangeditor/editor', '@wangeditor/editor-for-vue', 'markdown-it'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
+              return 'vue-vendor'
+            }
+            if (id.includes('element-plus')) {
+              return 'element-plus'
+            }
+            if (id.includes('echarts')) {
+              return 'echarts'
+            }
+            if (id.includes('@wangeditor') || id.includes('markdown-it')) {
+              return 'editor'
+            }
+          }
         },
       },
     },
