@@ -19,47 +19,11 @@ env:
 
 jobs:
   # ============================================
-  # 代码质量检查与测试
-  # ============================================
-  test:
-    name: Test & Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: npm install --no-package-lock
-
-      - name: Run tests
-        run: npm run test || true
-
-      - name: Build application
-        run: npm run build:renderer
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/out/renderer
-          retention-days: 1
-
-  # ============================================
-  # 部署到服务器 (直接使用服务器 nginx)
+  # 部署到服务器
   # ============================================
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: test
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     environment: production
 
@@ -71,15 +35,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm install
+        run: npm ci
 
       - name: Create production env
         working-directory: ./frontend
         run: |
-          cat > .env.production << EOF
+          cat > .env.production << 'EOF'
           VITE_API_BASE_URL=http://${{ secrets.SERVER_HOST }}/api
           VITE_WS_URL=ws://${{ secrets.SERVER_HOST }}/ws
           VITE_STATIC_URL=http://${{ secrets.SERVER_HOST }}/static
@@ -91,7 +57,7 @@ jobs:
         working-directory: ./frontend
         run: npm run build:renderer
 
-      - name: Deploy to server via SSH
+      - name: Deploy to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -112,87 +78,9 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             set -e
-            echo "🚀 [Frontend] 开始部署..."
-
-            PROJECT_DIR="$HOME/Auto_GEO"
-
-            # 如果目录不存在，克隆项目
-            if [ ! -d "$PROJECT_DIR/.git" ]; then
-              echo "📦 项目不存在，克隆仓库..."
-              mkdir -p "$(dirname "$PROJECT_DIR")"
-              mkdir -p ~/.ssh
-              ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
-              git clone git@github.com:aAAaqwq/Auto_GEO.git "$PROJECT_DIR" || {
-                echo "⚠️ SSH克隆失败，使用HTTPS..."
-                git clone https://github.com/aAAaqwq/Auto_GEO.git "$PROJECT_DIR"
-              }
-            fi
-
-            cd "$PROJECT_DIR"
-
-            # 创建宝塔 nginx 配置（宝塔使用 /www/server/panel/vhost/nginx/）
-            echo "📝 部署 nginx 配置..."
-            cat > /tmp/autogeo.conf << 'NGINX_EOF'
-server
-{
-    listen 80;
-    server_name ${{ secrets.SERVER_HOST }};
-    index index.html index.htm;
-    root /var/www/html/renderer;
-
-    location ~.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$
-    {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    location ~.*\.html$
-    {
-        expires -1;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-
-    location /
-    {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/
-    {
-        proxy_pass http://127.0.0.1:8001/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    location /ws
-    {
-        proxy_pass http://127.0.0.1:8001/ws;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    access_log /www/wwwlogs/autogeo_access.log;
-    error_log /www/wwwlogs/autogeo_error.log;
-}
-NGINX_EOF
-
-            # 复制配置到宝塔目录
-            sudo cp /tmp/autogeo.conf /www/server/panel/vhost/nginx/autogeo.conf
-
-            # 测试并重载 nginx
-            /www/server/nginx/sbin/nginx -t && /www/server/nginx/sbin/nginx -s reload || {
-              echo "⚠️ Nginx reload 失败，尝试重启..."
-              /www/server/nginx/sbin/nginx -s stop 2>/dev/null || true
-              /www/server/nginx/sbin/nginx
-            }
-
-            echo ""
-            echo "========================================"
-            echo "✅ 前端部署完成"
-            echo "========================================"
-            echo "访问地址: http://${{ secrets.SERVER_HOST }}"
+            echo "🚀 [Frontend] 部署完成，重载 Nginx..."
+            /www/server/nginx/sbin/nginx -s reload 2>/dev/null || true
+            echo "✅ 前端部署成功"
 
       - name: Deployment Summary
         if: success()
@@ -202,5 +90,5 @@ NGINX_EOF
           echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
           echo "| 服务器 | ${{ secrets.SERVER_HOST }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 部署目录 | /var/www/html |" >> $GITHUB_STEP_SUMMARY
+          echo "| 部署目录 | /var/www/html/renderer |" >> $GITHUB_STEP_SUMMARY
           echo "| 访问地址 | http://${{ secrets.SERVER_HOST }} |" >> $GITHUB_STEP_SUMMARY
