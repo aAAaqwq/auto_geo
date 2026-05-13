@@ -2,14 +2,12 @@
 # 版本: 3.1.0
 # 适用: 阿里云ECS生产部署（不含 RAGFlow）
 
-version: '3.8'
-
 services:
   # ============================================
   # PostgreSQL 数据库
   # ============================================
   postgres:
-    image: registry.cn-hangzhou.aliyuncs.com/acs-sample/postgres:15-alpine
+    image: postgres:15-alpine
     container_name: autogeo_postgres
     deploy:
       resources:
@@ -48,7 +46,7 @@ services:
   # Nginx 反向代理 + 静态文件服务
   # ============================================
   nginx:
-    image: registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:alpine
+    image: nginx:alpine
     container_name: autogeo_nginx
     deploy:
       resources:
