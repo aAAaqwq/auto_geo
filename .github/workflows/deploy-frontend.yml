@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist
+          path: frontend/out/renderer
           retention-days: 1
 
   # ============================================
@@ -97,7 +97,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          source: "frontend/dist/*"
+          source: "frontend/out/renderer/*"
           target: "~/Auto_GEO/deploy/nginx/html"
           strip_components: 2
           rm: true
