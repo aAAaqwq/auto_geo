@@ -78,26 +78,29 @@ jobs:
             cd "$PROJECT_DIR/deploy"
             export DEPLOY_DIR="$PROJECT_DIR/deploy"
 
+            # 确保 .env.backend 存在
             if [ ! -f ".env.backend" ]; then
-              echo "❌ .env.backend 不存在"
-              exit 1
+              echo "⚠️ .env.backend 不存在，从 .env.example 创建..."
+              cp .env.example .env.backend
+            fi
+
+            # 检查并添加 JWT_SECRET_KEY
+            if grep -q "^JWT_SECRET_KEY=" .env.backend 2>/dev/null; then
+              echo "✅ JWT_SECRET_KEY 已配置"
+            else
+              echo "🔑 添加 JWT_SECRET_KEY 到 .env.backend"
+              echo "" >> .env.backend
+              echo "# ==================== JWT认证配置 ====================" >> .env.backend
+              echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env.backend
             fi
 
             docker login crpi-lwz264sedmauvivo.cn-guangzhou.personal.cr.aliyuncs.com \
               -u "${{ secrets.ALIYUN_ACR_USERNAME }}" \
               -p "${{ secrets.ALIYUN_ACR_PASSWORD }}" 2>/dev/null || true
 
-            docker-compose -f deploy/backend/docker-compose.yml pull backend || true
             docker-compose -f deploy/backend/docker-compose.yml up -d
 
-            # 更新环境变量并重启（确保 JWT_SECRET_KEY 生效）
-            if grep -q "JWT_SECRET_KEY" .env.backend 2>/dev/null; then
-              echo "✅ JWT_SECRET_KEY 已配置"
-            else
-              echo "⚠️  JWT_SECRET_KEY 未在 .env.backend 中找到，请确保已配置"
-            fi
-
-            sleep 10
+            sleep 15
 
             if curl -sf http://localhost:8001/api/health > /dev/null 2>&1; then
               echo "✅ [Backend] 部署成功"
