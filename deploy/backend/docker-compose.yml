@@ -19,14 +19,14 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
-      - DATABASE_URL=postgresql://n8n:${N8N_DB_PASSWORD:-n8n_password_2024}@n8n_postgres:5432/autogeo
+      - DATABASE_URL=${DATABASE_URL:-postgresql://n8n:opencaio%40321@n8n_postgres:5432/autogeo}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
       - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
       - API_HOST=0.0.0.0
       - API_PORT=8001
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://8.138.59.152,http://8.163.39.114}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
       - N8N_API_KEY=${N8N_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
@@ -41,6 +41,8 @@ services:
       - backend_logs:/app/logs
       - ./backups:/app/backups
       - playwright_cache:/ms-playwright
+    ports:
+      - "127.0.0.1:8001:8001"
     networks:
       - n8n_network
     restart: unless-stopped

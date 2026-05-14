@@ -234,6 +234,7 @@ jobs:
             export DB_NAME="${DB_NAME:-autogeo}"
             export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
             export LOG_LEVEL="${LOG_LEVEL:-INFO}"
+            export DATABASE_URL="postgresql://n8n:opencaio%40321@n8n_postgres:5432/autogeo"
 
             echo "📦 环境变量已设置:"
             echo "   - BACKEND_IMAGE: $BACKEND_IMAGE"
